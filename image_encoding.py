@@ -4,7 +4,6 @@ import numpy as np
 import pyNN.utility.plotting as plt
 import sys
 import pathlib as plb
-import time
 
 training_dir = sys.argv[1]
 #verif_img = sys.argv[2]
@@ -92,14 +91,13 @@ print('Built networks')
 panels = []
 for network in networks:
     network['out_p'].record('spikes')
-#for verif_img in training_imgs:
-for i in range(2):
+for verif_img in training_imgs:
     # set the input spikes of every network to the current image
-    input_rates = rates_from_img(training_imgs[i])
+    input_rates = rates_from_img(verif_img)
     print(input_rates)
     for network in networks:
         network['in_p'].set(rate=input_rates)
-    print('Starting simulation with image', training_imgs[i])
+    print('Starting simulation with image', verif_img)
     sim.run(500)
 
 for weight_array in weight_arrays:
