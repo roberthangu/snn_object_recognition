@@ -142,8 +142,8 @@ sim.setup()
 print('Built networks')
 
 networks = []
-for initial_weights in weight_arrays:
-    network = build_network(initial_weights)
+for static_weights in weight_arrays:
+    network = build_network(static_weights)
     networks.append(network)
 
 # For each different input image, set the spike rate of the neurons in all
