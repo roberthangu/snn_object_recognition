@@ -5,25 +5,24 @@ import pyNN.utility.plotting as plt
 import sys
 import pathlib as plb
 
-def rates_from_img(source_img):
+def create_spike_source_layer_from(source_np_array):
     """
-    Takes an image and computes the rates of a input neurons accorning to this
-    image
+    For a given image returns a layer of spike source neurons to encode the
+    image intensities in spikes. Acts as an encoder.
     """
-    img = np.array(cv2.imread(source_img, cv2.CV_8U)).ravel()
-    rates = [] 
-    # take x * 4 as the firing rate
-    for i in map(lambda x: int(x / 4), img):
-        rates.append(i)
-    return rates
+    reshaped_array = source_np_array.ravel()
+    spike_source_layer = sim.Population(size=len(reshaped_array),
+                                   cellclass=sim.SpikeSourcePoisson(\
+                                     rate=lambda i: int(reshaped_array[i] / 4)))
+    return spike_source_layer
 
-def build_and_train_network(firing_rates):
+def recognizer_weights_from(feature_np_array):
     """
-    Builds a network from the given firing_rates for the input neurons and
-    learns the weights to recognize the image through STDP.
+    Builds a network from the firing rates of the given feature_np_array for the input
+    neurons and learns the weights to recognize the image through STDP.
     """
-    in_p = sim.Population(size=len(firing_rates),
-                          cellclass=sim.SpikeSourcePoisson(rate=firing_rates))
+    sim.setup()
+    in_p = create_spike_source_layer_from(feature_np_array)
     out_p = sim.Population(1, sim.IF_curr_exp(i_offset=5))
     synapse = sim.STDPMechanism(weight=-0.4,
               timing_dependence=sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
@@ -31,55 +30,51 @@ def build_and_train_network(firing_rates):
                                                   A_minus=0.005),
               weight_dependence=sim.AdditiveWeightDependence(w_min=0, w_max=0.4))
     proj = sim.Projection(in_p, out_p, sim.AllToAllConnector(), synapse)
-    return {'in_p': in_p, 'out_p': out_p, 'proj': proj}
-    
-def weight_list_from_img(source_img):
-    """
-    Returns network weights to recognize the given image through training
-    """
-    network = build_and_train_network(rates_from_img(source_img))
     sim.run(500)
-    return network['proj'].get('weight', 'array')
-
-def create_spike_source_layer_from(target_img):
-    img = np.array(cv2.imread(target_img, cv2.CV_8U)).ravel()
-    spike_source_layer = sim.Population(size=len(img),
-                            cellclass=sim.SpikeSourcePoisson(rate=lambda i: int(img[i] / 4)))
-    return spike_source_layer
-
-class BasicFeatureDetector():
+    weights = proj.get('weight', 'array')
+    sim.stop()
+    return weights
+    
+class PositionInvarianceLayer:
     """
-    Represents a basic feature detector
+    Represents a position invariance layer to detect a given feature in the
+    given image.
+    
+    Arguments:
+        `feature_img`:
+            The image with the feature to be recognized
+
+        `target_img`:
+            The "big" image in which to detect the feature
+
+        `delta_n`:
+            The vertical space between the connected feature detectors
+
+        `delta_m`:
+            The horizontal space between the connected feature detectors
     """
 
-    in_p = None
-    out_p = None
-    proj = None
+    input_layer = None
+    output_layer = None
+    projection = None
 
-    def __init__(self, input_image, preffered_size=(10, 10),
-                 initial_weights=None):
-        """
-        Gets an input image as a parameter from which it learns the feature.
-        The final recognizer will detect features in the given size
-        """
-        
-        # TODO: In the future do something with the preffered_size to create a
-        # detector with this size
-        
-    def build_network(static_weights):
-        """
-        Builds a network from a list of static weights.
-        """
-        in_p = sim.Population(size=len(static_weights),
-                              cellclass=sim.SpikeSourcePoisson(rate=0))
-        out_p = sim.Population(1, sim.IF_curr_exp())
-        synapse = sim.StaticSynapse(weight=static_weights)
-        proj = sim.Projection(in_p, out_p, sim.AllToAllConnector(), synapse)
-        return {'in_p': in_p, 'out_p': out_p, 'proj': proj}
+    def __init__(self, feature_img, target_img, delta_n=1, delta_m=1):
+        feature_np_array = np.array(cv2.imread(feature_img, cv2.CV_8U))
+        target_np_array = np.array(cv2.imread(target_img, cv2.CV_8U))
+        # Take care of the weights of the basic feature recognizers
+        weights = recognizer_weights_from(feature_np_array)
+        self.input_layer = create_spike_source_layer_from(target_np_array)
 
-class PositionInvarianceLayer():
-    def __init__(self, feature_img, target_img, delta_x=1, delta_y=1):
+        # Determine how many output neurons can be connected to the input layer
+        # according to the deltas
+        f_n, f_m = feature_np_array.shape
+        t_n, t_m = target_np_array.shape
+        m = (t_m - f_m) / delta_m + ((t_m - f_m) % delta_m > 1) + 1
+        n = (t_n - f_n) / delta_n + ((t_n - f_n) % delta_n > 1) + 1
+        
+
+        # Go through the lines of the image and connect output neurons to the
+        # input layer according to delta_h and delta_v.
+        
         feature_detectors = [BasicFeatureDetector(feature_img)] * 10000
-        weigths = weight_list_from_img(feature_img)
-    # Use a connector to provide the input images as poisson source neurons
-    #def connect_to_encoded_img(img_encoder):
+        weigths = recognizer_weights_from(feature_img)
