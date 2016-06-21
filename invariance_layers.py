@@ -21,6 +21,24 @@ parser.add_argument('--delta_j', metavar='horiz', default=dflt_move, type=int,
 args = parser.parse_args()
 print(args)
 
+class Layer:
+    # TODO: In the future the layer class may also store other information, like
+    #       references to the layer before and after it. Think about a nice way
+    #       to represent the layers in this pipeline.
+    """
+    Represents a layer in the network architecture.
+
+    Attributes:
+        
+        `population`: The pyNN neuron population of the layer
+
+        `shape`:      The shape of the layer as a tuple
+    """
+
+    def __init__(self, population, shape):
+        self.population = population
+        self.shape = shape
+
 def create_spike_source_layer_from(source_np_array):
     """
     For a given image returns a layer of spike source neurons to encode the
@@ -33,14 +51,14 @@ def create_spike_source_layer_from(source_np_array):
         rates.append(int(rate / 4))
     spike_source_layer = sim.Population(size=len(rates),
                                    cellclass=sim.SpikeSourcePoisson(rate=rates))
-    return spike_source_layer
+    return Layer(spike_source_layer, source_np_array.shape)
 
 def recognizer_weights_from(feature_np_array):
     """
     Builds a network from the firing rates of the given feature_np_array for the
     input neurons and learns the weights to recognize the image through STDP.
     """
-    in_p = create_spike_source_layer_from(feature_np_array)
+    in_p = create_spike_source_layer_from(feature_np_array).population
     out_p = sim.Population(1, sim.IF_curr_exp(i_offset=5))
     synapse = sim.STDPMechanism(weight=-0.2,
               timing_dependence=sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
@@ -51,12 +69,13 @@ def recognizer_weights_from(feature_np_array):
     sim.run(500)
     return proj.get('weight', 'array')
 
-def connect_layers(input_layer, output_layer, weights, m, i_s, j_s, i_e, j_e,
+def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
                    k_out):
     """
     Connects a small recognizer output layer to a big spike source generator
     layer.
     """
+    m = input_layer.shape[1]
     view_elements = []
     i = i_s
     while i < i_e:
@@ -65,34 +84,35 @@ def connect_layers(input_layer, output_layer, weights, m, i_s, j_s, i_e, j_e,
             view_elements.append(m * i + j)
             j += 1
         i += 1
-    sim.Projection(input_layer[view_elements],
-                   output_layer[[k_out]],
+    sim.Projection(input_layer.population[view_elements],
+                   output_population[[k_out]],
                    sim.AllToAllConnector(),
                    sim.StaticSynapse(weight=weights))
 
-def number_of_S1_neurons(f_n, f_m, t_n, t_m, delta_i, delta_j):
+def number_of_neurons_in(f_n, f_m, t_n, t_m, delta_i, delta_j):
     n = int((t_n - f_n) / delta_i) + ((t_n - f_n) % delta_i > 0) + 1
     m = int((t_m - f_m) / delta_j) + ((t_m - f_m) % delta_j > 0) + 1
     return (n, m)
 
-def create_output_layer(input_layer, feature_shape, target_shape,
-                        delta_i, delta_j, weights, layer_name):
+def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
+                        layer_name):
     """
     Builds a layer which creates an output layer which connects to the
     input_layer according to the given parameters.
     """
-    f_n, f_m = feature_shape
-    t_n, t_m = target_shape
+    weights = weights_tuple[0]
+    f_n, f_m = weights_tuple[1]
+    t_n, t_m = input_layer.shape
     # Determine how many output neurons can be connected to the input layer
     # according to the deltas
     overfull_n = (t_n - f_n) % delta_i > 0 # True for vertical overflow
     overfull_m = (t_m - f_m) % delta_j > 0 # True for horizontal overflow
-    n, m = number_of_S1_neurons(f_n, f_m, t_n, t_m, delta_i, delta_j)
+    n, m = number_of_neurons_in(f_n, f_m, t_n, t_m, delta_i, delta_j)
     total_output_neurons = n * m
     print('Number of output neurons {} for size {}x{}'.format(\
                                             total_output_neurons, t_n, t_m))
-    output_layer = sim.Population(total_output_neurons, sim.IF_curr_exp(),
-                                  label=layer_name)
+    output_population = sim.Population(total_output_neurons, sim.IF_curr_exp(),
+                                       label=layer_name)
     
     # Go through the lines of the image and connect input neurons to the
     # output layer according to delta_i and delta_j.
@@ -101,39 +121,39 @@ def create_output_layer(input_layer, feature_shape, target_shape,
     while i + f_n <= t_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_m, i, j, i + f_n, j + f_m, k_out)
+            connect_layers(input_layer, output_population, weights,
+                           i, j, i + f_n, j + f_m, k_out)
             k_out += 1
             j += delta_j
         if overfull_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_m, i, t_m - f_m, i + f_n, t_m, k_out)
+            connect_layers(input_layer, output_population, weights,
+                           i, t_m - f_m, i + f_n, t_m, k_out)
             k_out += 1
         i += delta_i
     if overfull_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_m, t_n - f_n, j, t_n, j + f_m, k_out)
+            connect_layers(input_layer, output_population, weights,
+                           t_n - f_n, j, t_n, j + f_m, k_out)
             k_out += 1
             j += delta_j
         if overfull_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_m, t_n - f_n, t_m - f_m, t_n, t_m, k_out)
+            connect_layers(input_layer, output_population, weights,
+                           t_n - f_n, t_m - f_m, t_n, t_m, k_out)
             k_out += 1
-    return output_layer
+    return Layer(output_population, (n, m))
 
-def create_invariance_layers_for_all_features_for(input_layer, target_shape,
-                                                  weights_dict):
+def create_scale_invariance_layers_for(input_layer, weights_dict):
     """
     Takes an input spike source layer and a dict of weight arrays and creates an
     output layer for each separate feature.
+
+    Returns a list of layers.
     """
-    invariance_layers = []
-    for layer_name, (weights, feature_shape) in weights_dict.items():
-        invariance_layers.append(create_output_layer(input_layer, feature_shape,
-                                                     target_shape, args.delta_i,
-                                                     args.delta_j, weights,
+    invariance_layers = [] # list of layers
+    for layer_name, weights_tuple in weights_dict.items():
+        invariance_layers.append(create_output_layer(input_layer, weights_tuple,
+                                                     args.delta_i, args.delta_j,
                                                      layer_name))
     return invariance_layers
  
@@ -194,71 +214,95 @@ if args.plot_weights:
 # The training part is done. Go on with the "actual" simulation
 sim.setup(threads=4)
 target_img = cv2.imread(args.target_name, cv2.CV_8U)
-feature_layers = {} # input size -> feature layers
+S1_layers = {} # input size -> list of S1 feature layers
+C1_layers = {} # input size -> list of C1 layers
 for size in [1, 0.71, 0.5, 0.35, 0.25]:
     resized_target_np_array = cv2.resize(src=target_img, dsize=None,
                                          fx=size, fy=size,
                                          interpolation=cv2.INTER_AREA)
     print('resized target shape: ', resized_target_np_array.shape)
+
+    # Create S1 layers for the current size
     input_layer = create_spike_source_layer_from(resized_target_np_array)
-    print('input population size: ', input_layer.size)
-    feature_layers[size] = create_invariance_layers_for_all_features_for(\
-                                                  input_layer,
-                                                  resized_target_np_array.shape,
-                                                  weights_dict)
-for layers in feature_layers.values():
-    for layer in layers:
-        layer.record('spikes')
+    print('input population size: ', input_layer.population.size)
+    current_invariance_layers = create_scale_invariance_layers_for(\
+                                                  input_layer, weights_dict)
+    S1_layers[size] = current_invariance_layers
+
+    # Create C1 layers for the current size
+    C1_layers[size] = []
+    C1_subsampling_shape = (7, 7)
+    neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
+    move_i, move_j = (6, 6)
+    C1_weight = 5
+    weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
+                     C1_subsampling_shape)
+    for S1_layer in current_invariance_layers:
+        print('creating C1 output layer')
+        C1_output_layer = create_output_layer(S1_layer, weights_tuple,
+                               move_i, move_j, S1_layer.population.label)
+        print('created layer')
+        C1_layers[size].append(C1_output_layer)
+
+# Keep these arrays for ease of recording and plotting
+layer_collection = [S1_layers, C1_layers]
+layer_names = ['S1', 'C1']
+
+for i in range(2):
+    for layers in layer_collection[i].values():
+        for layer in layers:
+            layer.population.record('spikes')
 
 print('========= Start simulation =========')
 sim.run(300)
 print('========= Stop  simulation =========')
 
-# Start the visualization
-t_n, t_m = target_img.shape
-print('target shape: ', t_n, t_m)
-visualization_img = np.zeros( (t_n, t_m) )
-max_firing = 60
-for size, layers in feature_layers.items():
-    scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
-    for layer in layers:
-        print('layer :', layer.label)
-        out_data = layer.get_data().segments[0]
-        feature_label = layer.label
-        feature_img = feature_imgs_dict[feature_label]
-        print('feature img shape: ', feature_img.shape)
-        f_n, f_m = feature_img.shape
-        st_n, st_m = scaled_vis_img.shape
-        print('scaled vis shape: ', st_n, st_m)
-#        n = m = int(np.sqrt(len(out_data.spiketrains)))
-        n, m = number_of_S1_neurons(f_n, f_m, st_n, st_m,
-                                    args.delta_i, args.delta_j)
-        print(n, m, n * m, len(out_data.spiketrains)) 
-        for i in range(len(out_data.spiketrains)):
-            # each spiketrain corresponds to a layer S1 output neuron
-            copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
-                                  feature_img, scaled_vis_img,
-                                  f_n, f_m, st_n, st_m, n, m)
-    upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
-                                  interpolation=cv2.INTER_CUBIC)
-    print('upscaled vis shape: ', upscaled_vis_img.shape)
-    visualization_img += upscaled_vis_img
-        
-cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
-                                           visualization_img)
-
-#for size, layers in feature_layers.items():
-#    spike_panels = []
+## Start the visualization
+#t_n, t_m = target_img.shape
+#print('target shape: ', t_n, t_m)
+#visualization_img = np.zeros( (t_n, t_m) )
+#max_firing = 60
+#for size, layers in S1_layers.items():
+#    scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
 #    for layer in layers:
-#        out_data = layer.get_data().segments[0]
-#        spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-#                                      xticks=True, yticks=True,
-#                                      xlabel='{}, {} scale layer'.format(\
-#                                                            layer.label, size)))
-#    plt.Figure(*spike_panels).save('plots/{}_{}_scale.png'.format(\
-#                                            plb.Path(args.target_name).stem,
-#                                            size))
+#        print('layer :', layer.population.label)
+#        out_data = layer.population.get_data().segments[0]
+#        feature_label = layer.population.label
+#        feature_img = feature_imgs_dict[feature_label]
+#        print('feature img shape: ', feature_img.shape)
+#        f_n, f_m = feature_img.shape
+#        st_n, st_m = scaled_vis_img.shape
+#        print('scaled vis shape: ', st_n, st_m)
+##        n = m = int(np.sqrt(len(out_data.spiketrains)))
+#        n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
+#                                    args.delta_i, args.delta_j)
+#        print(n, m, n * m, len(out_data.spiketrains)) 
+#        for i in range(len(out_data.spiketrains)):
+#            # each spiketrain corresponds to a layer S1 output neuron
+#            copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
+#                                  feature_img, scaled_vis_img,
+#                                  f_n, f_m, st_n, st_m, n, m)
+#    upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
+#                                  interpolation=cv2.INTER_CUBIC)
+#    print('upscaled vis shape: ', upscaled_vis_img.shape)
+#    visualization_img += upscaled_vis_img
+#        
+#cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
+#                                           visualization_img)
 
+for i in range(2):
+    for size, layers in layer_collection[i].items():
+        spike_panels = []
+        for layer in layers:
+            out_data = layer.population.get_data().segments[0]
+            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                                          xticks=True, yticks=True,
+                                          xlabel='{}, {} scale layer'.format(\
+                                                                layer.population.label, size)))
+        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+                                                layer_names[i],
+                                                plb.Path(args.target_name).stem,
+                                                size))
 
 
 sim.end()
