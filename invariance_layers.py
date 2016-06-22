@@ -6,6 +6,7 @@ import sys
 import pathlib as plb
 import argparse as ap
 import pyNN.nest as sim
+import rosbag
 
 dflt_move=4
 parser = ap.ArgumentParser(description='Invariance layer experiment')
@@ -38,6 +39,40 @@ class Layer:
     def __init__(self, population, shape):
         self.population = population
         self.shape = shape
+
+class Stream:
+    def __init__(self, events, shape):
+        self.events = events
+        self.shape = shape
+
+def resize_stream(stream, size):
+    # no interpolation so far
+    resized_shape = np.ceil(np.multiply(stream.shape, size)).astype(int)
+    resized_events = np.copy(stream.events)
+    for event in resized_events:
+        event.x = np.floor(event.x / size)
+        event.y = np.floor(event.y / size)
+    return Stream(resized_events, resized_shape)
+
+def read_stream(filename):
+    bag = rosbag.Bag(filename)
+    allEvents = []
+
+    for topic, msg, t in bag.read_messages(topics=['dvs/events']):
+        allEvents = np.append(allEvents, msg.events)
+        shape = [msg.width, msg.height]
+    bag.close()
+    return Stream(allEvents, shape)
+
+def create_spike_source_layer_from_stream(stream):
+    nNeurons = stream.shape[0] * stream.shape[1]
+    spike_times = []
+    for neuron in range(nNeurons):
+        spike_times.append(np.arange(1, 300, 1))
+
+    spike_source_layer = sim.Population(size=len(spike_times),
+                                   cellclass=sim.SpikeSourceArray(spike_times=spike_times))
+    return Layer(spike_source_layer, stream.shape)
 
 def create_spike_source_layer_from(source_np_array):
     """
@@ -84,6 +119,7 @@ def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
             view_elements.append(m * i + j)
             j += 1
         i += 1
+
     sim.Projection(input_layer.population[view_elements],
                    output_population[[k_out]],
                    sim.AllToAllConnector(),
@@ -213,36 +249,48 @@ if args.plot_weights:
 
 # The training part is done. Go on with the "actual" simulation
 sim.setup(threads=4)
-target_img = cv2.imread(args.target_name, cv2.CV_8U)
+
+file_extension = plb.Path(args.target_name).suffix
+
+if file_extension == '.bag':
+    target_stream = read_stream(args.target_name)
+else:
+    target_img = cv2.imread(args.target_name, cv2.CV_8U)
+
 S1_layers = {} # input size -> list of S1 feature layers
 C1_layers = {} # input size -> list of C1 layers
-for size in [1, 0.71, 0.5, 0.35, 0.25]:
-    resized_target_np_array = cv2.resize(src=target_img, dsize=None,
-                                         fx=size, fy=size,
-                                         interpolation=cv2.INTER_AREA)
-    print('resized target shape: ', resized_target_np_array.shape)
+for size in [1]:
+    if file_extension == '.bag':
+        resized_target_stream = resize_stream(target_stream, size)
+        input_layer = create_spike_source_layer_from_stream(resized_target_stream)
+    else:
+        resized_target_np_array = cv2.resize(src=target_img, dsize=None,
+                                             fx=size, fy=size,
+                                             interpolation=cv2.INTER_AREA)
+        print('resized target shape: ', resized_target_np_array.shape)
 
-    # Create S1 layers for the current size
-    input_layer = create_spike_source_layer_from(resized_target_np_array)
+        # Create S1 layers for the current size
+        input_layer = create_spike_source_layer_from(resized_target_np_array)
+
     print('input population size: ', input_layer.population.size)
     current_invariance_layers = create_scale_invariance_layers_for(\
                                                   input_layer, weights_dict)
     S1_layers[size] = current_invariance_layers
 
-    # Create C1 layers for the current size
-    C1_layers[size] = []
-    C1_subsampling_shape = (7, 7)
-    neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
-    move_i, move_j = (6, 6)
-    C1_weight = 5
-    weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
-                     C1_subsampling_shape)
-    for S1_layer in current_invariance_layers:
-        print('creating C1 output layer')
-        C1_output_layer = create_output_layer(S1_layer, weights_tuple,
-                               move_i, move_j, S1_layer.population.label)
-        print('created layer')
-        C1_layers[size].append(C1_output_layer)
+    # # Create C1 layers for the current size
+    # C1_layers[size] = []
+    # C1_subsampling_shape = (7, 7)
+    # neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
+    # move_i, move_j = (6, 6)
+    # C1_weight = 5
+    # weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
+    #                  C1_subsampling_shape)
+    # for S1_layer in current_invariance_layers:
+    #     print('creating C1 output layer')
+    #     C1_output_layer = create_output_layer(S1_layer, weights_tuple,
+    #                            move_i, move_j, S1_layer.population.label)
+    #     print('created layer')
+    #     C1_layers[size].append(C1_output_layer)
 
 # Keep these arrays for ease of recording and plotting
 layer_collection = [S1_layers, C1_layers]
@@ -253,9 +301,9 @@ for i in range(2):
         for layer in layers:
             layer.population.record('spikes')
 
-print('========= Start simulation =========')
+print('========= Start simulation: {} ========='.format(sim.get_current_time()))
 sim.run(300)
-print('========= Stop  simulation =========')
+print('========= Stop simulation: {} ========='.format(sim.get_current_time()))
 
 ## Start the visualization
 #t_n, t_m = target_img.shape
