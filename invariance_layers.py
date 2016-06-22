@@ -42,8 +42,8 @@ class Layer:
 def create_spike_source_layer_from(source_np_array):
     """
     For a given image returns a layer of spike source neurons to encode the
-    image intensities in spikes. Acts as an encoder. The size of the spike
-    source layer is the number of pixels in the image.
+    image intensities in spikes. The size of the spike source layer is the
+    number of pixels in the image.
     """
     reshaped_array = source_np_array.ravel()
     rates = []
@@ -157,8 +157,22 @@ def create_scale_invariance_layers_for(input_layer, weights_dict):
                                                      layer_name))
     return invariance_layers
 
-def copy_to_visualization(pos, ratio, feature_img, visualization_img,
-                          f_n, f_m, t_n, t_m, n, m):
+def copy_to_visualization(pos, ratio, feature_img, visualization_img, n, m):
+    """
+    Copies a feature image onto the visualization canvas at the given position
+    with the given intensity.
+
+    Arguments:
+        `pos`: The position where the feature should be painted
+
+        `ratio`: The intensity ratio with which the feature should be painted
+
+        `feature_img`: The feature which should be drawn
+
+        `visualization_img`: The image onto which to paint the feature
+
+        `n, m`: The shape of the neuron layer which detects the features
+    """
 #    feature_img = np.array([\
 #        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
 #        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
@@ -170,6 +184,8 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
 #        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
 #        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
 #        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0]])
+    f_n, f_m = feature_img.shape
+    t_n, t_m = visualization_img.shape
     p_i = int(pos / m)
     p_j = pos % m
     delta_i = args.delta_i
@@ -177,9 +193,9 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
     start_i = delta_i * p_i
     start_j = delta_j * p_j
     if p_i == n - 1:
-        start_i = n - f_n
+        start_i = t_n - f_n
     if p_j == m - 1:
-        start_j = m - f_m
+        start_j = t_m - f_m
     rationated_feature_img = ratio * feature_img
     for i in range(f_n):
         for j in range(f_m):
@@ -194,6 +210,52 @@ def plot_weights(weights_dict):
                                        xticks=True, yticks=True))
 
     plt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
+
+def reconstruct_image(target_img_shape, layers_dict, feature_imgs_dict):
+    """
+    Reconstructs the initial image by drawing the features on the recognized
+    positions with an intensity proportional to the respective neuron firing rate.
+
+    Parameters:
+        `target_image_shape`: The shape of the original image
+
+        `layers_dict`: A dictionary containing for each image scale all feature
+                       layers after recording.
+        
+        `feature_imgs_dict`: A dictionary containing for each name the
+                             corresponding feature image
+
+    Returns:
+        The final reconstructed image after drawing the recognized features on it
+    """
+    t_n, t_m = target_img_shape
+    print('target shape: ', t_n, t_m)
+    visualization_img = np.zeros( (t_n, t_m) )
+    max_firing = 60
+    for size, layers in layers_dict.items():
+        scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
+        for layer in layers:
+            print('layer :', layer.population.label)
+            out_data = layer.population.get_data().segments[0]
+            feature_label = layer.population.label
+            feature_img = feature_imgs_dict[feature_label]
+            print('feature img shape: ', feature_img.shape)
+            f_n, f_m = feature_img.shape
+            st_n, st_m = scaled_vis_img.shape
+            print('scaled vis shape: ', st_n, st_m)
+#        n = m = int(np.sqrt(len(out_data.spiketrains)))
+            n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
+                                        args.delta_i, args.delta_j)
+            print(n, m, n * m, len(out_data.spiketrains))
+            for i in range(len(out_data.spiketrains)):
+                # each spiketrain corresponds to a layer S1 output neuron
+                copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
+                                      feature_img, scaled_vis_img, n, m)
+        upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
+                                      interpolation=cv2.INTER_CUBIC)
+        print('upscaled vis shape: ', upscaled_vis_img.shape)
+        visualization_img += upscaled_vis_img
+    return visualization_img
 
 
 sim.setup()
@@ -230,25 +292,25 @@ for size in [1, 0.71, 0.5, 0.35, 0.25]:
     S1_layers[size] = current_invariance_layers
 
     # Create C1 layers for the current size
-    C1_layers[size] = []
-    C1_subsampling_shape = (7, 7)
-    neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
-    move_i, move_j = (6, 6)
-    C1_weight = 5
-    weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
-                     C1_subsampling_shape)
-    for S1_layer in current_invariance_layers:
-        print('creating C1 output layer')
-        C1_output_layer = create_output_layer(S1_layer, weights_tuple,
-                               move_i, move_j, S1_layer.population.label)
-        print('created layer')
-        C1_layers[size].append(C1_output_layer)
+#    C1_layers[size] = []
+#    C1_subsampling_shape = (7, 7)
+#    neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
+#    move_i, move_j = (6, 6)
+#    C1_weight = 5
+#    weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
+#                     C1_subsampling_shape)
+#    for S1_layer in current_invariance_layers:
+#        print('creating C1 output layer')
+#        C1_output_layer = create_output_layer(S1_layer, weights_tuple,
+#                               move_i, move_j, S1_layer.population.label)
+#        print('created layer')
+#        C1_layers[size].append(C1_output_layer)
 
 # Keep these arrays for ease of recording and plotting
-layer_collection = [S1_layers, C1_layers]
-layer_names = ['S1', 'C1']
+layer_collection = [S1_layers]#, C1_layers]
+layer_names = ['S1']#, 'C1']
 
-for i in range(2):
+for i in range(len(layer_collection)):
     for layers in layer_collection[i].values():
         for layer in layers:
             layer.population.record('spikes')
@@ -257,52 +319,23 @@ print('========= Start simulation =========')
 sim.run(300)
 print('========= Stop  simulation =========')
 
-## Start the visualization
-#t_n, t_m = target_img.shape
-#print('target shape: ', t_n, t_m)
-#visualization_img = np.zeros( (t_n, t_m) )
-#max_firing = 60
-#for size, layers in S1_layers.items():
-#    scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
-#    for layer in layers:
-#        print('layer :', layer.population.label)
-#        out_data = layer.population.get_data().segments[0]
-#        feature_label = layer.population.label
-#        feature_img = feature_imgs_dict[feature_label]
-#        print('feature img shape: ', feature_img.shape)
-#        f_n, f_m = feature_img.shape
-#        st_n, st_m = scaled_vis_img.shape
-#        print('scaled vis shape: ', st_n, st_m)
-##        n = m = int(np.sqrt(len(out_data.spiketrains)))
-#        n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
-#                                    args.delta_i, args.delta_j)
-#        print(n, m, n * m, len(out_data.spiketrains))
-#        for i in range(len(out_data.spiketrains)):
-#            # each spiketrain corresponds to a layer S1 output neuron
-#            copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
-#                                  feature_img, scaled_vis_img,
-#                                  f_n, f_m, st_n, st_m, n, m)
-#    upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
-#                                  interpolation=cv2.INTER_CUBIC)
-#    print('upscaled vis shape: ', upscaled_vis_img.shape)
-#    visualization_img += upscaled_vis_img
+vis_img = reconstruct_image(target_img.shape, S1_layers, feature_imgs_dict)
+cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
+                                           vis_img)
+
+#for i in range(2):
+#    for size, layers in layer_collection[i].items():
+#        spike_panels = []
+#        for layer in layers:
+#            out_data = layer.population.get_data().segments[0]
+#            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+#                                          xticks=True, yticks=True,
+#                                          xlabel='{}, {} scale layer'.format(\
+#                                                                layer.population.label, size)))
+#        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+#                                                layer_names[i],
+#                                                plb.Path(args.target_name).stem,
+#                                                size))
 #
-#cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
-#                                           visualization_img)
-
-for i in range(2):
-    for size, layers in layer_collection[i].items():
-        spike_panels = []
-        for layer in layers:
-            out_data = layer.population.get_data().segments[0]
-            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-                                          xticks=True, yticks=True,
-                                          xlabel='{}, {} scale layer'.format(\
-                                                                layer.population.label, size)))
-        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-                                                layer_names[i],
-                                                plb.Path(args.target_name).stem,
-                                                size))
-
 
 sim.end()
