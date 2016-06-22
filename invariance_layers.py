@@ -29,7 +29,7 @@ class Layer:
     Represents a layer in the network architecture.
 
     Attributes:
-        
+
         `population`: The pyNN neuron population of the layer
 
         `shape`:      The shape of the layer as a tuple
@@ -113,7 +113,7 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
                                             total_output_neurons, t_n, t_m))
     output_population = sim.Population(total_output_neurons, sim.IF_curr_exp(),
                                        label=layer_name)
-    
+
     # Go through the lines of the image and connect input neurons to the
     # output layer according to delta_i and delta_j.
     k_out = 0
@@ -156,7 +156,7 @@ def create_scale_invariance_layers_for(input_layer, weights_dict):
                                                      args.delta_i, args.delta_j,
                                                      layer_name))
     return invariance_layers
- 
+
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
                           f_n, f_m, t_n, t_m, n, m):
 #    feature_img = np.array([\
@@ -194,7 +194,7 @@ def plot_weights(weights_dict):
                                        xticks=True, yticks=True))
 
     plt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
-    
+
 
 sim.setup()
 # Take care of the weights of the basic feature recognizers
@@ -276,7 +276,7 @@ print('========= Stop  simulation =========')
 ##        n = m = int(np.sqrt(len(out_data.spiketrains)))
 #        n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
 #                                    args.delta_i, args.delta_j)
-#        print(n, m, n * m, len(out_data.spiketrains)) 
+#        print(n, m, n * m, len(out_data.spiketrains))
 #        for i in range(len(out_data.spiketrains)):
 #            # each spiketrain corresponds to a layer S1 output neuron
 #            copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
@@ -286,7 +286,7 @@ print('========= Stop  simulation =========')
 #                                  interpolation=cv2.INTER_CUBIC)
 #    print('upscaled vis shape: ', upscaled_vis_img.shape)
 #    visualization_img += upscaled_vis_img
-#        
+#
 #cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
 #                                           visualization_img)
 
