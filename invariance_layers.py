@@ -50,25 +50,35 @@ def resize_stream(stream, size):
     resized_shape = np.ceil(np.multiply(stream.shape, size)).astype(int)
     resized_events = np.copy(stream.events)
     for event in resized_events:
-        event.x = np.floor(event.x / size)
-        event.y = np.floor(event.y / size)
+        event.x = int(np.floor(event.x / size))
+        event.y = int(np.floor(event.y / size))
     return Stream(resized_events, resized_shape)
 
 def read_stream(filename):
     bag = rosbag.Bag(filename)
     allEvents = []
-
-    for topic, msg, t in bag.read_messages(topics=['dvs/events']):
+    initial_time = None
+    for topic, msg, t in bag.read_messages(topics=['/dvs/events']):
+        if not initial_time and msg.events:
+            # we want the first event to happen at 1ms
+            initial_time = int(msg.events[0].ts.to_sec() * 1000) - 1
+        for event in msg.events:
+            event.ts = int(event.ts.to_sec() * 1000) - initial_time
         allEvents = np.append(allEvents, msg.events)
         shape = [msg.width, msg.height]
     bag.close()
+
     return Stream(allEvents, shape)
 
 def create_spike_source_layer_from_stream(stream):
     nNeurons = stream.shape[0] * stream.shape[1]
     spike_times = []
+
     for neuron in range(nNeurons):
-        spike_times.append(np.arange(1, 300, 1))
+        spike_times.append([])
+    for event in stream.events:
+        nIdx = event.x * stream.shape[0] + event.y
+        spike_times[nIdx].append(event.ts)
 
     spike_source_layer = sim.Population(size=len(spike_times),
                                    cellclass=sim.SpikeSourceArray(spike_times=spike_times))
@@ -302,7 +312,7 @@ for i in range(2):
             layer.population.record('spikes')
 
 print('========= Start simulation: {} ========='.format(sim.get_current_time()))
-sim.run(300)
+sim.run(2000)
 print('========= Stop simulation: {} ========='.format(sim.get_current_time()))
 
 ## Start the visualization
