@@ -50,8 +50,8 @@ def resize_stream(stream, size):
     resized_shape = np.ceil(np.multiply(stream.shape, size)).astype(int)
     resized_events = np.copy(stream.events)
     for event in resized_events:
-        event.x = int(np.floor(event.x / size))
-        event.y = int(np.floor(event.y / size))
+        event.x = int(np.floor(event.x * size))
+        event.y = int(np.floor(event.y * size))
     return Stream(resized_events, resized_shape)
 
 def read_stream(filename):
