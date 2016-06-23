@@ -203,6 +203,21 @@ def create_scale_invariance_layers_for(input_layer, weights_dict):
                                                      layer_name))
     return invariance_layers
 
+def create_corner_layer_for(input_layers):
+    shape = input_layers[0].shape
+    total_output_neurons = np.prod(shape)
+
+    output_population = sim.Population(total_output_neurons, sim.IF_curr_exp(),
+                                       label='corner')
+    for layer in input_layers:
+        sim.Projection(layer.population,
+                       output_population,
+                       sim.OneToOneConnector(),
+                       sim.StaticSynapse(weight=0.5, delay=0.5))
+
+    return Layer(output_population, shape)
+
+
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
                           f_n, f_m, t_n, t_m, n, m):
 #    feature_img = np.array([\
@@ -269,7 +284,8 @@ else:
 
 S1_layers = {} # input size -> list of S1 feature layers
 C1_layers = {} # input size -> list of C1 layers
-for size in [1]:
+CORNER_layers = {} # input size -> list of Corner layers
+for size in [0.4]:
     if file_extension == '.bag':
         resized_target_stream = resize_stream(target_stream, size)
         input_layer = create_spike_source_layer_from_stream(resized_target_stream)
@@ -302,11 +318,13 @@ for size in [1]:
     #     print('created layer')
     #     C1_layers[size].append(C1_output_layer)
 
-# Keep these arrays for ease of recording and plotting
-layer_collection = [S1_layers, C1_layers]
-layer_names = ['S1', 'C1']
 
-for i in range(2):
+    CORNER_layers[size] = [create_corner_layer_for(current_invariance_layers)]
+# Keep these arrays for ease of recording and plotting
+layer_collection = [S1_layers, CORNER_layers]
+layer_names = ['S1', 'CORNER']
+
+for i in range(len(layer_collection)):
     for layers in layer_collection[i].values():
         for layer in layers:
             layer.population.record('spikes')
