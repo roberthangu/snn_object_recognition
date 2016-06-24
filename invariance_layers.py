@@ -9,15 +9,29 @@ import pyNN.nest as sim
 
 dflt_move=4
 parser = ap.ArgumentParser(description='Invariance layer experiment')
-parser.add_argument('--plot_weights', action='store_true')
-parser.add_argument('-f', '--feature_dir', type=str, required=True)
-parser.add_argument('-t', '--target_name', type=str, required=True)
+parser.add_argument('--plot-weights', action='store_true',
+                    help='Plots the learned feature weights and exits')
+parser.add_argument('-f', '--feature-dir', type=str, required=True,
+                    help='A directory where the features are stored as images')
+parser.add_argument('-t', '--target-name', type=str, required=True,
+                    help='The name of the already edge-filtered image to\
+                        be recognized')
+parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the S1 layer in ms')
+parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the C1 layer in ms')
+parser.add_argument('--no-c1', action='store_true',
+                    help='Disables the creation of C1 layers')
+parser.add_argument('--reconstruct-img', action='store_true',
+                    help='If set, draws a reconstruction of the recognized\
+                    features from S1')
 #parser.add_argument('-o', '--plot_img', type=str, required=True)
 #parser.add_argument('--plot_img', type=str, default='spikes_vert_line.png')
-parser.add_argument('--delta_i', metavar='vert', default=dflt_move, type=int,
+parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
                     help='The vertical distance between the basic recognizers')
-parser.add_argument('--delta_j', metavar='horiz', default=dflt_move, type=int,
-                    help='The horizontal distance between the basic recognizers')
+parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
+                    help='The horizontal distance between the basic feature\
+                    recognizers')
 args = parser.parse_args()
 print(args)
 
@@ -38,6 +52,8 @@ class Layer:
     def __init__(self, population, shape):
         self.population = population
         self.shape = shape
+
+#    def get_neurons_from_list(
 
 def create_spike_source_layer_from(source_np_array):
     """
@@ -95,7 +111,7 @@ def number_of_neurons_in(f_n, f_m, t_n, t_m, delta_i, delta_j):
     return (n, m)
 
 def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
-                        layer_name):
+                        layer_name, refrac):
     """
     Builds a layer which creates an output layer which connects to the
     input_layer according to the given parameters.
@@ -111,7 +127,8 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
     total_output_neurons = n * m
     print('Number of output neurons {} for size {}x{}'.format(\
                                             total_output_neurons, t_n, t_m))
-    output_population = sim.Population(total_output_neurons, sim.IF_curr_exp(),
+    output_population = sim.Population(total_output_neurons,
+                                       sim.IF_curr_exp(tau_refrac=refrac),
                                        label=layer_name)
 
     # Go through the lines of the image and connect input neurons to the
@@ -143,7 +160,7 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
             k_out += 1
     return Layer(output_population, (n, m))
 
-def create_scale_invariance_layers_for(input_layer, weights_dict):
+def create_scale_invariance_layers_for(input_layer, weights_dict, refrac):
     """
     Takes an input spike source layer and a dict of weight arrays and creates an
     output layer for each separate feature.
@@ -154,7 +171,7 @@ def create_scale_invariance_layers_for(input_layer, weights_dict):
     for layer_name, weights_tuple in weights_dict.items():
         invariance_layers.append(create_output_layer(input_layer, weights_tuple,
                                                      args.delta_i, args.delta_j,
-                                                     layer_name))
+                                                     layer_name, refrac))
     return invariance_layers
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img, n, m):
@@ -288,54 +305,60 @@ for size in [1, 0.71, 0.5, 0.35, 0.25]:
     input_layer = create_spike_source_layer_from(resized_target_np_array)
     print('input population size: ', input_layer.population.size)
     current_invariance_layers = create_scale_invariance_layers_for(\
-                                                  input_layer, weights_dict)
+                                                  input_layer, weights_dict,
+                                                  args.refrac_s1)
     S1_layers[size] = current_invariance_layers
 
-    # Create C1 layers for the current size
-#    C1_layers[size] = []
-#    C1_subsampling_shape = (7, 7)
-#    neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
-#    move_i, move_j = (6, 6)
-#    C1_weight = 5
-#    weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
-#                     C1_subsampling_shape)
-#    for S1_layer in current_invariance_layers:
-#        print('creating C1 output layer')
-#        C1_output_layer = create_output_layer(S1_layer, weights_tuple,
-#                               move_i, move_j, S1_layer.population.label)
-#        print('created layer')
-#        C1_layers[size].append(C1_output_layer)
+    if not args.no_c1:
+        # Create C1 layers for the current size
+        C1_layers[size] = []
+        C1_subsampling_shape = (7, 7)
+        neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
+        move_i, move_j = (6, 6)
+        C1_weight = 5
+        weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
+                         C1_subsampling_shape)
+        for S1_layer in current_invariance_layers:
+            print('creating C1 output layer')
+            C1_output_layer = create_output_layer(S1_layer, weights_tuple,
+                                   move_i, move_j, S1_layer.population.label,
+                                   args.refrac_c1)
+            print('created layer')
+            C1_layers[size].append(C1_output_layer)
 
 # Keep these arrays for ease of recording and plotting
-layer_collection = [S1_layers]#, C1_layers]
-layer_names = ['S1']#, 'C1']
+layer_collection = [S1_layers, C1_layers]
+layer_names = ['S1', 'C1']
 
 for i in range(len(layer_collection)):
-    for layers in layer_collection[i].values():
-        for layer in layers:
-            layer.population.record('spikes')
+    if layer_collection[i] != None:
+        for layers in layer_collection[i].values():
+            for layer in layers:
+                layer.population.record('spikes')
 
 print('========= Start simulation =========')
 sim.run(300)
 print('========= Stop  simulation =========')
 
-vis_img = reconstruct_image(target_img.shape, S1_layers, feature_imgs_dict)
-cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
-                                           vis_img)
+if args.reconstruct_img:
+    vis_img = reconstruct_image(target_img.shape, S1_layers, feature_imgs_dict)
+    cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
+                                               vis_img)
 
-#for i in range(2):
-#    for size, layers in layer_collection[i].items():
-#        spike_panels = []
-#        for layer in layers:
-#            out_data = layer.population.get_data().segments[0]
-#            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-#                                          xticks=True, yticks=True,
-#                                          xlabel='{}, {} scale layer'.format(\
-#                                                                layer.population.label, size)))
-#        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-#                                                layer_names[i],
-#                                                plb.Path(args.target_name).stem,
-#                                                size))
-#
+for i in range(len(layer_collection)):
+    if layer_collection[i] != None:
+        for size, layers in layer_collection[i].items():
+            spike_panels = []
+            for layer in layers:
+                out_data = layer.population.get_data().segments[0]
+                spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                                              xticks=True, yticks=True,
+                                              xlabel='{}, {} scale layer'.format(\
+                                                        layer.population.label, size)))
+            plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+                                                    layer_names[i],
+                                                    plb.Path(args.target_name).stem,
+                                                    size))
+
 
 sim.end()
