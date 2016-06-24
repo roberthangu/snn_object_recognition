@@ -1,7 +1,9 @@
 #!/bin/ipython
-import cv2
 import numpy as np
-import pyNN.utility.plotting as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import cv2
+import pyNN.utility.plotting as pynnplt
 import sys
 import pathlib as plb
 import argparse as ap
@@ -77,6 +79,9 @@ def create_spike_source_layer_from_stream(stream):
     for neuron in range(nNeurons):
         spike_times.append([])
     for event in stream.events:
+        if not event.polarity:
+            # we only consider ON events
+            pass
         nIdx = event.x * stream.shape[0] + event.y
         spike_times[nIdx].append(event.ts)
 
@@ -213,7 +218,7 @@ def create_corner_layer_for(input_layers):
         sim.Projection(layer.population,
                        output_population,
                        sim.OneToOneConnector(),
-                       sim.StaticSynapse(weight=0.5, delay=0.5))
+                       sim.StaticSynapse(weight=1., delay=0.5))
 
     return Layer(output_population, shape)
 
@@ -250,11 +255,11 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
 def plot_weights(weights_dict):
     weight_panels = []
     for name, (weights, shape) in weights_dict.items():
-        weight_panels.append(plt.Panel(weights.reshape(10, -1), cmap='gray',
+        weight_panels.append(pynnplt.Panel(weights.reshape(10, -1), cmap='gray',
                                        xlabel='{} Connection weights'.format(name),
                                        xticks=True, yticks=True))
 
-    plt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
+    pynnplt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
 
 
 sim.setup()
@@ -278,25 +283,25 @@ sim.setup(threads=4)
 file_extension = plb.Path(args.target_name).suffix
 
 if file_extension == '.bag':
-    target_stream = read_stream(args.target_name)
+    target = read_stream(args.target_name)
 else:
-    target_img = cv2.imread(args.target_name, cv2.CV_8U)
+    target = cv2.imread(args.target_name, cv2.CV_8U)
 
 S1_layers = {} # input size -> list of S1 feature layers
 C1_layers = {} # input size -> list of C1 layers
 CORNER_layers = {} # input size -> list of Corner layers
-for size in [0.4]:
+for size in [0.2]:
     if file_extension == '.bag':
-        resized_target_stream = resize_stream(target_stream, size)
-        input_layer = create_spike_source_layer_from_stream(resized_target_stream)
+        resized_target = resize_stream(target, size)
+        input_layer = create_spike_source_layer_from_stream(resized_target)
     else:
-        resized_target_np_array = cv2.resize(src=target_img, dsize=None,
-                                             fx=size, fy=size,
-                                             interpolation=cv2.INTER_AREA)
-        print('resized target shape: ', resized_target_np_array.shape)
+        resized_target = cv2.resize(src=target, dsize=None,
+                                    fx=size, fy=size,
+                                    interpolation=cv2.INTER_AREA)
+        print('resized target shape: ', resized_target.shape)
 
         # Create S1 layers for the current size
-        input_layer = create_spike_source_layer_from(resized_target_np_array)
+        input_layer = create_spike_source_layer_from(resized_target)
 
     print('input population size: ', input_layer.population.size)
     current_invariance_layers = create_scale_invariance_layers_for(\
@@ -334,48 +339,77 @@ sim.run(2000)
 print('========= Stop simulation: {} ========='.format(sim.get_current_time()))
 
 ## Start the visualization
-#t_n, t_m = target_img.shape
-#print('target shape: ', t_n, t_m)
-#visualization_img = np.zeros( (t_n, t_m) )
-#max_firing = 60
-#for size, layers in S1_layers.items():
-#    scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
-#    for layer in layers:
-#        print('layer :', layer.population.label)
-#        out_data = layer.population.get_data().segments[0]
-#        feature_label = layer.population.label
-#        feature_img = feature_imgs_dict[feature_label]
-#        print('feature img shape: ', feature_img.shape)
-#        f_n, f_m = feature_img.shape
-#        st_n, st_m = scaled_vis_img.shape
-#        print('scaled vis shape: ', st_n, st_m)
-##        n = m = int(np.sqrt(len(out_data.spiketrains)))
-#        n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
-#                                    args.delta_i, args.delta_j)
-#        print(n, m, n * m, len(out_data.spiketrains))
-#        for i in range(len(out_data.spiketrains)):
-#            # each spiketrain corresponds to a layer S1 output neuron
-#            copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
-#                                  feature_img, scaled_vis_img,
-#                                  f_n, f_m, st_n, st_m, n, m)
-#    upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
-#                                  interpolation=cv2.INTER_CUBIC)
-#    print('upscaled vis shape: ', upscaled_vis_img.shape)
-#    visualization_img += upscaled_vis_img
-#
-#cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
-#                                           visualization_img)
+t_n, t_m = target.shape
+print('target shape: ', t_n, t_m)
+visualization_img = np.zeros( (t_n, t_m) )
+max_firing = 60.
+# max_firing = 2
+for size, layers in S1_layers.items():
+   scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
+   for layer in layers:
+       print('layer :', layer.population.label)
+       out_data = layer.population.get_data().segments[0]
+       feature_label = layer.population.label
+       feature_img = feature_imgs_dict[feature_label]
+       print('feature img shape: ', feature_img.shape)
+       f_n, f_m = feature_img.shape
+       st_n, st_m = scaled_vis_img.shape
+       print('scaled vis shape: ', st_n, st_m)
+       n = m = int(np.sqrt(len(out_data.spiketrains)))
+       n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
+                                   args.delta_i, args.delta_j)
+       print(n, m, n * m, len(out_data.spiketrains))
+       for i in range(len(out_data.spiketrains)):
+           # each spiketrain corresponds to a layer S1 output neuron
+           copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
+                                 feature_img, scaled_vis_img,
+                                 f_n, f_m, st_n, st_m, n, m)
+   upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
+                                 interpolation=cv2.INTER_CUBIC)
+   print('upscaled vis shape: ', upscaled_vis_img.shape)
+   visualization_img += upscaled_vis_img
+
+cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
+                                          visualization_img)
+
+# visualize spatiotemporal spiketrain
+def plot_spatiotemporal_spiketrain(size, layer_name, spiketrain, shape):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = []
+    y = []
+    times = []
+    for neuron in spiketrain:
+        populationIdx = neuron.annotations['source_id']
+        imageIdx = [populationIdx / shape[0], populationIdx % shape[0]]
+        for spike in neuron:
+            x.append(imageIdx[0])
+            y.append(imageIdx[1])
+            times.append(spike)
+    ax.scatter(x,times,y)
+    ax.set_xlabel('X')
+    ax.set_zlabel('Y')
+    ax.set_ylabel('times')
+    fig.savefig('spatiotemporal_{}_{}.png'.format(layer_name, size))
+    plt.close(fig)
+
+for size, layers in S1_layers.items():
+    for layer in layers:
+        out_data = layer.population.get_data().segments[0]
+        plot_spatiotemporal_spiketrain(size, layer.population.label,
+                                       out_data.spiketrains,
+                                       target.shape)
 
 for i in range(2):
     for size, layers in layer_collection[i].items():
         spike_panels = []
         for layer in layers:
             out_data = layer.population.get_data().segments[0]
-            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+            spike_panels.append(pynnplt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
                                           xticks=True, yticks=True,
                                           xlabel='{}, {} scale layer'.format(\
                                                                 layer.population.label, size)))
-        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+        pynnplt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
                                                 layer_names[i],
                                                 plb.Path(args.target_name).stem,
                                                 size))
