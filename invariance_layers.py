@@ -9,7 +9,7 @@ import pathlib as plb
 import argparse as ap
 import pyNN.nest as sim
 import rosbag
-from cycler import cycler
+import pickle
 
 dflt_move=4
 parser = ap.ArgumentParser(description='Invariance layer experiment')
@@ -58,9 +58,10 @@ class Layer:
         self.shape = shape
 
 class Stream:
-    def __init__(self, events, shape):
+    def __init__(self, events, shape, duration):
         self.events = events
         self.shape = shape
+        self.duration = duration
 
 def resize_stream(stream, size):
     # no interpolation so far
@@ -69,12 +70,13 @@ def resize_stream(stream, size):
     for event in resized_events:
         event.x = int(np.floor(event.x * size))
         event.y = int(np.floor(event.y * size))
-    return Stream(resized_events, resized_shape)
+    return Stream(resized_events, resized_shape, stream.duration)
 
 def read_stream(filename):
     bag = rosbag.Bag(filename)
     allEvents = []
     initial_time = None
+    last_time = 0
     for topic, msg, t in bag.read_messages(topics=['/dvs/events']):
         if not initial_time and msg.events:
             # we want the first event to happen at 1ms
@@ -82,10 +84,11 @@ def read_stream(filename):
         for event in msg.events:
             event.ts = int(event.ts.to_sec() * 1000) - initial_time
         allEvents = np.append(allEvents, msg.events)
+        last_time = t.to_sec() * 1000
         shape = [msg.width, msg.height]
     bag.close()
 
-    return Stream(allEvents, shape)
+    return Stream(allEvents, shape, last_time - initial_time)
 
 def create_spike_source_layer_from_stream(stream):
     nNeurons = stream.shape[0] * stream.shape[1]
@@ -292,7 +295,7 @@ def plot_weights(weights_dict):
 
     pynnplt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
 
-def reconstruct_image(target_img_shape, layers_dict, feature_imgs_dict):
+def reconstruct_image(max_firing, target_img_shape, layers_dict, feature_imgs_dict):
     """
     Reconstructs the initial image by drawing the features on the recognized
     positions with an intensity proportional to the respective neuron firing rate.
@@ -312,7 +315,6 @@ def reconstruct_image(target_img_shape, layers_dict, feature_imgs_dict):
     t_n, t_m = target_img_shape
     print('target shape: ', t_n, t_m)
     visualization_img = np.zeros( (t_n, t_m) )
-    max_firing = 60
     for size, layers in layers_dict.items():
         scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
         for layer in layers:
@@ -358,6 +360,7 @@ if args.plot_weights:
 sim.setup(threads=4)
 
 file_extension = plb.Path(args.target_name).suffix
+filename = plb.Path(args.target_name).stem
 
 if file_extension == '.bag':
     target = read_stream(args.target_name)
@@ -415,14 +418,17 @@ for i in range(len(layer_collection)):
             for layer in layers:
                 layer.population.record('spikes')
 
+stimuli_duration = 0
+if file_extension == '.bag':
+    stimuli_duration = target.duration
+
 print('========= Start simulation: {} ========='.format(sim.get_current_time()))
-# sim.run(2000)
-sim.run(30000)
+sim.run(stimuli_duration + 300)
 print('========= Stop simulation: {} ========='.format(sim.get_current_time()))
 
 
 # visualize spatiotemporal spiketrain
-def plot_spatiotemporal_spiketrain(ax, size, layer_name, spiketrain, shape):
+def extract_spatiotemporal_spiketrain(size, layer_name, spiketrain, shape):
     x = []
     y = []
     times = []
@@ -433,29 +439,23 @@ def plot_spatiotemporal_spiketrain(ax, size, layer_name, spiketrain, shape):
             x.append(imageIdx[0])
             y.append(imageIdx[1])
             times.append(spike)
-    ax.scatter(x,times,y, marker='o')
-    ax.set_xlabel('X')
-    ax.set_zlabel('Y')
-    ax.set_ylabel('times')
+    return [x, y, times]
 
-
-spacioFig = plt.figure()
-ax = spacioFig.add_subplot(111, projection='3d')
-ax.set_prop_cycle(cycler('c', ['r', 'g', 'b', 'y', 'c', 'm', 'y', 'k']))
+allSpatioTemporal = []
 for size, layers in S1_layers.items():
     for layer in layers:
         out_data = layer.population.get_data().segments[0]
-        plot_spatiotemporal_spiketrain(ax, size, layer.population.label,
-                                       out_data.spiketrains,
-                                       target.shape)
+        allSpatioTemporal.append(extract_spatiotemporal_spiketrain(size, layer.population.label,
+                                                                   out_data.spiketrains,
+                                                                   target.shape))
+pickle.dump(allSpatioTemporal, open("results/spatiotemporal_{}.p".format(filename), "wb"))
 
-spacioFig.savefig('spatiotemporal_{}.png'.format(plb.Path(args.target_name).stem))
-plt.close(spacioFig)
-
+max_spike_rate = 60. / 300. # mHz
+max_firing = max_spike_rate * (stimuli_duration + 300.)
 if args.reconstruct_img:
-    vis_img = reconstruct_image(target.shape, S1_layers, feature_imgs_dict)
-    cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
-                                               vis_img)
+    vis_img = reconstruct_image(max_firing, target.shape, S1_layers, feature_imgs_dict)
+    cv2.imwrite('{}_reconstruction.png'.format(filename), vis_img)
+
 
 for i in range(len(layer_collection)):
     if layer_collection[i] != None:
@@ -469,7 +469,7 @@ for i in range(len(layer_collection)):
                                                         layer.population.label, size)))
             pynnplt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
                                                     layer_names[i],
-                                                    plb.Path(args.target_name).stem,
+                                                    filename,
                                                     size))
 
 sim.end()
