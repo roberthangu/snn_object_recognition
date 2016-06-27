@@ -370,7 +370,7 @@ else:
 S1_layers = {} # input size -> list of S1 feature layers
 C1_layers = {} # input size -> list of C1 layers
 CORNER_layers = {} # input size -> list of Corner layers
-for size in [0.2]:
+for size in [1]:
     if file_extension == '.bag':
         resized_target = resize_stream(target, size)
         input_layer = create_spike_source_layer_from_stream(resized_target)
@@ -432,8 +432,7 @@ def extract_spatiotemporal_spiketrain(size, layer_name, spiketrain, shape):
     x = []
     y = []
     times = []
-    for neuron in spiketrain:
-        populationIdx = neuron.annotations['source_id']
+    for populationIdx, neuron in enumerate(spiketrain):
         imageIdx = [populationIdx / shape[0], populationIdx % shape[0]]
         for spike in neuron:
             x.append(imageIdx[0])
@@ -463,6 +462,16 @@ for i in range(len(layer_collection)):
             spike_panels = []
             for layer in layers:
                 out_data = layer.population.get_data().segments[0]
+                dump_filename = 'results/spiketrain_{}/{}_{}_scale.p'.format(\
+                                                                             filename,
+                                                                             layer.population.label,
+                                                                             size)
+                try:
+                    plb.Path(dump_filename).parent.mkdir(parents=True)
+                except OSError as exc:  # Python >2.5
+                    pass
+                pickle.dump(out_data.spiketrains,\
+                            open(dump_filename, 'wb'))
                 spike_panels.append(pynnplt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
                                               xticks=True, yticks=True,
                                               xlabel='{}, {} scale layer'.format(\
