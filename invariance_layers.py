@@ -9,6 +9,7 @@ import pathlib as plb
 import argparse as ap
 import pyNN.nest as sim
 import rosbag
+from cycler import cycler
 
 dflt_move=4
 parser = ap.ArgumentParser(description='Invariance layer experiment')
@@ -335,7 +336,8 @@ for i in range(len(layer_collection)):
             layer.population.record('spikes')
 
 print('========= Start simulation: {} ========='.format(sim.get_current_time()))
-sim.run(2000)
+# sim.run(2000)
+sim.run(30000)
 print('========= Stop simulation: {} ========='.format(sim.get_current_time()))
 
 ## Start the visualization
@@ -373,9 +375,7 @@ cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
                                           visualization_img)
 
 # visualize spatiotemporal spiketrain
-def plot_spatiotemporal_spiketrain(size, layer_name, spiketrain, shape):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+def plot_spatiotemporal_spiketrain(ax, size, layer_name, spiketrain, shape):
     x = []
     y = []
     times = []
@@ -386,19 +386,24 @@ def plot_spatiotemporal_spiketrain(size, layer_name, spiketrain, shape):
             x.append(imageIdx[0])
             y.append(imageIdx[1])
             times.append(spike)
-    ax.scatter(x,times,y)
+    ax.scatter(x,times,y, marker='o')
     ax.set_xlabel('X')
     ax.set_zlabel('Y')
     ax.set_ylabel('times')
-    fig.savefig('spatiotemporal_{}_{}.png'.format(layer_name, size))
-    plt.close(fig)
 
+
+spacioFig = plt.figure()
+ax = spacioFig.add_subplot(111, projection='3d')
+ax.set_prop_cycle(cycler('c', ['r', 'g', 'b', 'y', 'c', 'm', 'y', 'k']))
 for size, layers in S1_layers.items():
     for layer in layers:
         out_data = layer.population.get_data().segments[0]
-        plot_spatiotemporal_spiketrain(size, layer.population.label,
+        plot_spatiotemporal_spiketrain(ax, size, layer.population.label,
                                        out_data.spiketrains,
                                        target.shape)
+
+spacioFig.savefig('spatiotemporal_{}.png'.format(plb.Path(args.target_name).stem))
+plt.close(spacioFig)
 
 for i in range(2):
     for size, layers in layer_collection[i].items():
