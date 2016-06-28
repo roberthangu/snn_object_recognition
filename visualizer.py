@@ -9,7 +9,7 @@ from os.path import isfile, join
 
 pylab.ion()
 color_list = ['r', 'g', 'b', 'y', 'c', 'm', 'y', 'k']
-marker_list = [ '.', ',', 'o', 'v', '^', '<', '>' ]
+marker_list = [ '+', 'x', 'o', 'v', '^', '<', '>' ]
 
 def plot_3d_spatiotemporal():
     allSpikesPerLayer = pickle.load(open('results/spatiotemporal_dvs-page2-30s_2016-06-24-18-15-21.p', 'r'))
@@ -30,17 +30,28 @@ def plot_2d_spiketrains(pathToPickles):
     fig = plt.figure(figsize=(40,5))
     ax = fig.add_subplot(1, 1, 1)
 
-    allPickles = [join(pathToPickles, f) for f in listdir(pathToPickles) if isfile(join(pathToPickles, f))]
+    pickleFilenames = listdir(pathToPickles)
+    allPickles = [join(pathToPickles, f) for f in pickleFilenames if isfile(join(pathToPickles, f))]
     allSpiketrains = [ pickle.load(open(pickleFile, 'r')) for pickleFile in allPickles ]
     for featureMapIdx, spiketrain in enumerate(allSpiketrains):
+        populationName = pickleFilenames[featureMapIdx]
         x = []
         y = []
         for i, neuron in enumerate(spiketrain):
             for spike in neuron:
                 x.append(spike)
                 y.append(i)
-        ax.plot(x, y, marker_list[featureMapIdx])
+        if populationName.startswith("corner"):
+            markersize = 10
+            alpha = 1
+        else:
+            markersize = 1
+            alpha = 0.1
 
-plot_2d_spiketrains('results/spiketrain_dvs-page4_2016-06-23-14-58-02')
+        ax.scatter(x, y, marker=marker_list[featureMapIdx], c=color_list[featureMapIdx], label=populationName, linewidths=markersize, alpha = alpha)
+    ax.legend()
+
+# plot_2d_spiketrains('results/spiketrain_dvs-page4_2016-06-23-14-58-02')
+plot_2d_spiketrains('results/spiketrain_dvs-page2-30s_2016-06-24-18-15-21')
 
 raw_input("Press Enter to continue...")
