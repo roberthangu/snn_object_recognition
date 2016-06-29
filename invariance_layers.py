@@ -22,9 +22,12 @@ parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
                     help='The refractory period of neurons in the C1 layer in ms')
 parser.add_argument('--no-c1', action='store_true',
                     help='Disables the creation of C1 layers')
-parser.add_argument('--reconstruct-img', action='store_true',
+parser.add_argument('--reconstruct-s1-img', action='store_true',
                     help='If set, draws a reconstruction of the recognized\
                     features from S1')
+parser.add_argument('--reconstruct-c1-img', action='store_true',
+                    help='If set, draws a reconstruction of the recognized\
+                    features from C1')
 #parser.add_argument('-o', '--plot_img', type=str, required=True)
 #parser.add_argument('--plot_img', type=str, default='spikes_vert_line.png')
 parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
@@ -52,8 +55,6 @@ class Layer:
     def __init__(self, population, shape):
         self.population = population
         self.shape = shape
-
-#    def get_neurons_from_list(
 
 def create_spike_source_layer_from(source_np_array):
     """
@@ -105,11 +106,6 @@ def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
                    sim.AllToAllConnector(),
                    sim.StaticSynapse(weight=weights))
 
-def number_of_neurons_in(f_n, f_m, t_n, t_m, delta_i, delta_j):
-    n = int((t_n - f_n) / delta_i) + ((t_n - f_n) % delta_i > 0) + 1
-    m = int((t_m - f_m) / delta_j) + ((t_m - f_m) % delta_j > 0) + 1
-    return (n, m)
-
 def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
                         layer_name, refrac):
     """
@@ -123,7 +119,8 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
     # according to the deltas
     overfull_n = (t_n - f_n) % delta_i > 0 # True for vertical overflow
     overfull_m = (t_m - f_m) % delta_j > 0 # True for horizontal overflow
-    n, m = number_of_neurons_in(f_n, f_m, t_n, t_m, delta_i, delta_j)
+    n = int((t_n - f_n) / delta_i) + ((t_n - f_n) % delta_i > 0) + 1
+    m = int((t_m - f_m) / delta_j) + ((t_m - f_m) % delta_j > 0) + 1
     total_output_neurons = n * m
     print('Number of output neurons {} for size {}x{}'.format(\
                                             total_output_neurons, t_n, t_m))
@@ -174,10 +171,11 @@ def create_scale_invariance_layers_for(input_layer, weights_dict, refrac):
                                                      layer_name, refrac))
     return invariance_layers
 
-def copy_to_visualization(pos, ratio, feature_img, visualization_img, n, m):
+def copy_to_visualization(pos, ratio, feature_img, visualization_img,
+                          layer_shape, delta_i, delta_j):
     """
     Copies a feature image onto the visualization canvas at the given position
-    with the given intensity.
+    of the neuron layer with the given intensity.
 
     Arguments:
         `pos`: The position where the feature should be painted
@@ -188,25 +186,19 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img, n, m):
 
         `visualization_img`: The image onto which to paint the feature
 
-        `n, m`: The shape of the neuron layer which detects the features
+        `layer_shape`: The shape of the neuron layer which detects the features
+
+        `delta_i`: The horizontal offset between the feature layers
+
+        `delta_j`: The vertical offset between the feature layers
     """
-#    feature_img = np.array([\
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
-#        [0,    0,    0,    0,    255,  255,  0,    0,    0,    0],
-#        [0,    0,    0,    255,  255,  255,  255,  0,    0,    0],
-#        [0,    0,    0,    255,  255,  255,  255,  0,    0,    0],
-#        [0,    0,    0,    0,    255,  255,  0,    0,    0,    0],
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0],
-#        [0,    0,    0,    0,    0,    0,    0,    0,    0,    0]])
-    f_n, f_m = feature_img.shape
-    t_n, t_m = visualization_img.shape
+    n, m = layer_shape
+    f_n = feature_img.shape[0]
+    f_m = feature_img.shape[1]
+    t_n = visualization_img.shape[0]
+    t_m = visualization_img.shape[1]
     p_i = int(pos / m)
     p_j = pos % m
-    delta_i = args.delta_i
-    delta_j = args.delta_j
     start_i = delta_i * p_i
     start_j = delta_j * p_j
     if p_i == n - 1:
@@ -228,7 +220,8 @@ def plot_weights(weights_dict):
 
     plt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
 
-def reconstruct_image(target_img_shape, layers_dict, feature_imgs_dict):
+def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
+                        delta_i, delta_j, canvas=None):
     """
     Reconstructs the initial image by drawing the features on the recognized
     positions with an intensity proportional to the respective neuron firing rate.
@@ -242,38 +235,63 @@ def reconstruct_image(target_img_shape, layers_dict, feature_imgs_dict):
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
+        `delta_i`: The horizontal offset between the feature layers
+
+        `delta_j`: The vertical offset between the feature layers
+
     Returns:
-        The final reconstructed image after drawing the recognized features on it
+        A dictionary which contains for each size a list of pairs of the
+        reconstructed images and their feature name, one pair for each feature
     """
     t_n, t_m = target_img_shape
-    print('target shape: ', t_n, t_m)
-    visualization_img = np.zeros( (t_n, t_m) )
-    max_firing = 60
+    visualization_img = None
+    three_channels = True
+    if canvas == None:
+        three_channels = False
+        visualization_img = np.zeros( (t_n, t_m) )
+    else:
+        visualization_img = canvas
+    max_firing = 1
     for size, layers in layers_dict.items():
-        scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
+        for layer in layers:
+            spiketrains = layer.population.get_data().segments[0].spiketrains
+            for spiketrain in spiketrains:
+                if len(spiketrain) > max_firing:
+                    max_firing = len(spiketrain)
+    partial_reconstructions_dict = {}   # size -> list of pairs of reconstructed
+                                        # images and their feature name
+    for size, layers in layers_dict.items():
+        scaled_vis_img = None
+        partial_reconstructions_dict[size] = []
+        if three_channels:
+            scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size), 3) )
+        else:
+            scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
         for layer in layers:
             print('layer :', layer.population.label)
             out_data = layer.population.get_data().segments[0]
             feature_label = layer.population.label
             feature_img = feature_imgs_dict[feature_label]
-            print('feature img shape: ', feature_img.shape)
-            f_n, f_m = feature_img.shape
-            st_n, st_m = scaled_vis_img.shape
-            print('scaled vis shape: ', st_n, st_m)
-#        n = m = int(np.sqrt(len(out_data.spiketrains)))
-            n, m = number_of_neurons_in(f_n, f_m, st_n, st_m,
-                                        args.delta_i, args.delta_j)
-            print(n, m, n * m, len(out_data.spiketrains))
+            st_n = scaled_vis_img.shape[0]
+            st_m = scaled_vis_img.shape[1]
             for i in range(len(out_data.spiketrains)):
                 # each spiketrain corresponds to a layer S1 output neuron
                 copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
-                                      feature_img, scaled_vis_img, n, m)
-        upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
-                                      interpolation=cv2.INTER_CUBIC)
-        print('upscaled vis shape: ', upscaled_vis_img.shape)
-        visualization_img += upscaled_vis_img
-    return visualization_img
+                                      feature_img, scaled_vis_img, layer.shape,
+                                      delta_i, delta_j)
+            upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
+                                          interpolation=cv2.INTER_CUBIC)
+            partial_reconstructions_dict[size].append(\
+                (visualization_img + upscaled_vis_img.astype(np.uint8),
+                 feature_label))
+            if three_channels:
+                scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size), 3) )
+            else:
+                scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
+    return partial_reconstructions_dict
 
+# TODO: - Create C1 feature visualization
+#       - Filter input images with a Canny filter
 
 sim.setup()
 # Take care of the weights of the basic feature recognizers
@@ -340,11 +358,49 @@ print('========= Start simulation =========')
 sim.run(300)
 print('========= Stop  simulation =========')
 
-if args.reconstruct_img:
-    vis_img = reconstruct_image(target_img.shape, S1_layers, feature_imgs_dict)
-    cv2.imwrite('{}_reconstruction.png'.format(plb.Path(args.target_name).stem),
+if args.reconstruct_s1_img:
+    vis_img = np.zeros(target_img.shape)
+    vis_parts = visualization_parts(target_img.shape, S1_layers, feature_imgs_dict,
+                                args.delta_i, args.delta_j)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            vis_img += img
+    cv2.imwrite('{}_S1_reconstruction.png'.format(plb.Path(args.target_name).stem),
                                                vis_img)
 
+if args.reconstruct_c1_img:
+    # Create the RGB canvas to draw colored rectangles for the features
+    canvas = cv2.cvtColor(target_img, cv2.COLOR_GRAY2RGB)
+    # Create the colored squares for the features in a map
+    colored_squares_dict = {} # feature name -> colored square
+    # A set of predefined colors
+    colors = {'red': (255, 0, 0),
+              'green': (0, 255, 0),
+              'blue': (0, 0, 255),
+              'yellow': (255, 255, 0),
+              'purple': (255, 0, 255)}
+    color_iterator = colors.__iter__()
+    for feature_name, feature_img in feature_imgs_dict.items():
+        color_name = color_iterator.__next__()
+        f_n, f_m = feature_img.shape
+        bf_n = 6 * args.delta_i + f_m   # "big" f_n
+        bf_m = 6 * args.delta_j + f_m   # "big" f_m
+        # Create a square to cover all pixels of a C1 neuron
+        square = np.zeros((bf_n, bf_m, 3))
+        cv2.rectangle(square, (0, 0), (bf_n - 1, bf_m - 1), colors[color_name])
+        print('feature name and color: ', feature_name, color_name)
+        colored_squares_dict[feature_name] = square
+    vis_parts = visualization_parts(target_img.shape, C1_layers,
+                                              colored_squares_dict,
+                                              6 * args.delta_i,
+                                              6 * args.delta_j, canvas)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            cv2.imwrite('reconstruction_components/{}_{}_C1_{}_reconstruction.png'.\
+                        format(feature_label, size, plb.Path(args.target_name).stem),
+                        img)
+
+# Plot the spike trains of both neuron layers
 for i in range(len(layer_collection)):
     if layer_collection[i] != None:
         for size, layers in layer_collection[i].items():
