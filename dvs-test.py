@@ -65,7 +65,7 @@ pickle.dump(allSpatioTemporal, open("results/spatiotemporal_{}.p".format(filenam
 
 max_spike_rate = 60. / 300. # mHz
 max_firing = max_spike_rate * (stimuli_duration + 300.)
-if args.reconstruct_img:
+if args.reconstruct_s1_img:
     vis_img = reconstruct_image(max_firing, target.shape, S1_layers, feature_imgs_dict)
     cv2.imwrite('{}_reconstruction.png'.format(filename), vis_img)
 
