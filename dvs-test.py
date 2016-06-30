@@ -5,6 +5,9 @@ import pickle
 import numpy as np
 import stream
 import pyNN.nest as sim
+import visualization as vis
+import cv2
+import pyNN.utility.plotting as pynnplt
 
 import common as cm
 import network as nw
@@ -20,17 +23,23 @@ file_extension = plb.Path(args.target_name).suffix
 filename = plb.Path(args.target_name).stem
 
 target = stream.read_stream(args.target_name)
-size = [1.]
-S1_layers = nw.create_S1_layers(target, weights_dict, [1.], args,
+size = 1
+S1_layers = nw.create_S1_layers(target, weights_dict, [size], args,
                                 is_bag=True)
 
 # NOTE: Since in your original code you're using only size 1 in creating the
 # corner layers, I don't create an extra dictionary to store only that one
 # layer. Hence the `corner_layer` variable.
-corner_layer = nw.create_corner_layer_for(S1_layers[1])
+corner_layer = nw.create_corner_layer_for(S1_layers[size])
+corner_layer_wrapped = { size: [corner_layer] }
 
 layer_collection = {'S1' : S1_layers,
-                    'corner': corner_layer}
+                    'corner': corner_layer_wrapped}
+
+for layer_dict in layer_collection.values():
+    for layers in layer_dict.values():
+        for layer in layers:
+            layer.population.record('spikes')
 
 stimuli_duration = 0
 if file_extension == '.bag':
@@ -66,8 +75,16 @@ pickle.dump(allSpatioTemporal, open("results/spatiotemporal_{}.p".format(filenam
 max_spike_rate = 60. / 300. # mHz
 max_firing = max_spike_rate * (stimuli_duration + 300.)
 if args.reconstruct_s1_img:
-    vis_img = reconstruct_image(max_firing, target.shape, S1_layers, feature_imgs_dict)
-    cv2.imwrite('{}_reconstruction.png'.format(filename), vis_img)
+    vis_img = np.zeros(target.shape)
+    vis_parts = vis.visualization_parts(target.shape,
+                                        layer_collection['S1'],
+                                        feature_imgs_dict,
+                                        args.delta_i, args.delta_j)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            vis_img += img
+    cv2.imwrite('{}_S1_reconstruction.png'.format(filename),
+                vis_img)
 
 # Plot the spike trains of both neuron layers
 for layer_name, layer_dict in layer_collection.items():
