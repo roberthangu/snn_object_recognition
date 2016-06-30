@@ -2,6 +2,7 @@ import numpy as np
 import pyNN.nest as sim
 import cv2
 import pathlib as plb
+import stream
 
 class Layer:
     # TODO: In the future the layer class may also store other information, like
@@ -34,6 +35,23 @@ def create_spike_source_layer_from(source_np_array):
     spike_source_layer = sim.Population(size=len(rates),
                                    cellclass=sim.SpikeSourcePoisson(rate=rates))
     return Layer(spike_source_layer, source_np_array.shape)
+
+def create_spike_source_layer_from_stream(stream):
+    nNeurons = stream.shape[0] * stream.shape[1]
+    spike_times = []
+
+    for neuron in range(nNeurons):
+        spike_times.append([])
+    for event in stream.events:
+        if not event.polarity:
+            # we only consider ON events
+            pass
+        nIdx = event.x * stream.shape[0] + event.y
+        spike_times[nIdx].append(event.ts)
+
+    spike_source_layer = sim.Population(size=len(spike_times),
+                                   cellclass=sim.SpikeSourceArray(spike_times=spike_times))
+    return Layer(spike_source_layer, stream.shape)
 
 def recognizer_weights_from(feature_np_array):
     """
@@ -134,10 +152,10 @@ def create_scale_invariance_layers_for(input_layer, weights_dict, args):
 
         `weights_dict`:
 
-        `args`: 
+        `args`:
 
     Returns:
-    
+
         A list of layers.
     """
     invariance_layers = [] # list of layers
@@ -168,7 +186,7 @@ def train_weights(feature_dir):
     sim.end() "session".
 
     Arguments:
-        
+
         `feature_dir`: The directory where the features are stored as images
 
     Returns:
@@ -197,7 +215,7 @@ def create_S1_layers(target, weights_dict, input_scales, args, is_bag=False):
 
         `target`: The target image or stream for which to create the S1 layers
 
-        `weights_dict`: 
+        `weights_dict`:
 
         `input_scales`: A list of scales for which to create a S1 layer
 
@@ -213,8 +231,7 @@ def create_S1_layers(target, weights_dict, input_scales, args, is_bag=False):
     S1_layers = {} # input size -> list of S1 feature layers
     for size in input_scales:
         if is_bag:
-            # TODO: Does it know that resize_stream() is in the calling context?
-            resized_target = resize_stream(target, size)
+            resized_target = stream.resize_stream(target, size)
             input_layer = create_spike_source_layer_from_stream(resized_target)
         else:
             resized_target = cv2.resize(src=target, dsize=None,
@@ -239,10 +256,10 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         `S1_layers_dict`: A dictionary containing for each size of the input
                           image a list of S1 layers, for each feature one
 
-        `refrac_c1`: 
+        `refrac_c1`:
 
     Returns:
-    
+
         A dictionary containing for each size of S1 layers a list of C1 layers
     """
     C1_layers = {} # input size -> list of C1 layers
@@ -262,4 +279,3 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
             print('created layer')
             C1_layers[size].append(C1_output_layer)
     return C1_layers
-
