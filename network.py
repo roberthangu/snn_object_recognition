@@ -2,7 +2,10 @@ import numpy as np
 import pyNN.nest as sim
 import cv2
 import pathlib as plb
-import stream
+try:
+    import stream
+except ImportError:
+    pass
 
 class Layer:
     # TODO: In the future the layer class may also store other information, like
@@ -196,7 +199,6 @@ def train_weights(feature_dir):
             feature_imgs_dict   :: feature name string -> feature image
     """
     sim.setup()
-    # Take care of the weights of the basic feature recognizers
     weights_dict = {}       # feature name string -> (weights, shape)
     feature_imgs_dict = {}  # feature name string -> feature image
     for training_img in plb.Path(feature_dir).iterdir():
@@ -263,7 +265,7 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         A dictionary containing for each size of S1 layers a list of C1 layers
     """
     C1_layers = {} # input size -> list of C1 layers
-    for size, S1_layers in S1_layers_dict:
+    for size, S1_layers in S1_layers_dict.items():
         C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]

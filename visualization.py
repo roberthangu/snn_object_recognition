@@ -74,6 +74,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
         reconstructed images and their feature name, one pair for each feature
     """
     t_n, t_m = target_img_shape
+    three_channels = True
     if canvas == None:
         three_channels = False
         visualization_img = np.zeros( (t_n, t_m) )
@@ -109,7 +110,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
             upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
                                           interpolation=cv2.INTER_CUBIC)
             partial_reconstructions_dict[size].append(\
-                (visualization_img + upscaled_vis_img.astype(np.uint8),
+                (visualization_img + upscaled_vis_img.astype(np.int64),
                  feature_label))
             if three_channels:
                 scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size), 3) )

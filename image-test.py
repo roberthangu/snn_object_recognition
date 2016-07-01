@@ -5,6 +5,7 @@ import sys
 import pyNN.nest as sim
 import pathlib as plb
 import pyNN.utility.plotting as plt
+import time
 
 import common as cm
 import network as nw
@@ -25,12 +26,12 @@ sim.setup(threads=4)
 
 target_img = cv2.imread(args.target_name, cv2.CV_8U)
 layer_collection = {}
-input_scales = [1, 0.71, 0.5, 0.35, 0.25]
 layer_collection['S1'] = nw.create_S1_layers(target_img, weights_dict,
-                                             input_scales,
+                                             [1, 0.71, 0.5, 0.35, 0.25],
                                              args)
 if not args.no_c1:
-    layer_collection['C1'] = nw.create_C1_layers(S1_layers, args.refrac_c1)
+    layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
+                                                 args.refrac_c1)
 
 
 for layer_dict in layer_collection.values():
@@ -39,10 +40,14 @@ for layer_dict in layer_collection.values():
             layer.population.record('spikes')
 
 print('========= Start simulation =========')
-sim.run(300)
+start_time = time.clock()
+sim.run(100)
+end_time = time.clock()
 print('========= Stop  simulation =========')
+print('Simulation took:', end_time - start_time)
 
 if args.reconstruct_s1_img:
+    print('Reconstructing S1 features')
     vis_img = np.zeros(target_img.shape)
     vis_parts = vis.visualization_parts(target_img.shape,
                                         layer_collection['S1'],
@@ -55,6 +60,7 @@ if args.reconstruct_s1_img:
                                                vis_img)
 
 if args.reconstruct_c1_img:
+    print('Reconstructing C1 features')
     # Create the RGB canvas to draw colored rectangles for the features
     canvas = cv2.cvtColor(target_img, cv2.COLOR_GRAY2RGB)
     # Create the colored squares for the features in a map
@@ -76,14 +82,14 @@ if args.reconstruct_c1_img:
         cv2.rectangle(square, (0, 0), (bf_n - 1, bf_m - 1), colors[color_name])
         print('feature name and color: ', feature_name, color_name)
         colored_squares_dict[feature_name] = square
-    vis_parts = visualization_parts(target_img.shape, C1_layers,
-                                              colored_squares_dict,
-                                              6 * args.delta_i,
-                                              6 * args.delta_j, canvas)
+    vis_parts = vis.visualization_parts(target_img.shape, layer_collection['C1'],
+                                        colored_squares_dict,
+                                        6 * args.delta_i,
+                                        6 * args.delta_j, canvas)
     for size, img_pairs in vis_parts.items():
         for img, feature_label in img_pairs:
             cv2.imwrite('reconstruction_components/{}_{}_C1_{}_reconstruction.png'.\
-                        format(feature_label, size, plb.Path(args.target_name).stem),
+                        format(plb.Path(args.target_name).stem, size, feature_label),
                         img)
 
 # Plot the spike trains of both neuron layers
