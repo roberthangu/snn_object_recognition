@@ -1,4 +1,5 @@
 import numpy as np
+import pathlib as plb
 import cv2
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
@@ -60,7 +61,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
         `target_image_shape`: The shape of the original image
 
         `layers_dict`: A dictionary containing for each image scale all feature
-                       layers after recording.
+                       layers after recording, one layer for each feature.
 
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
@@ -110,7 +111,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
             upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
                                           interpolation=cv2.INTER_CUBIC)
             partial_reconstructions_dict[size].append(\
-                (visualization_img + upscaled_vis_img.astype(np.int64),
+                (visualization_img + upscaled_vis_img.astype(np.int32),
                  feature_label))
             if three_channels:
                 scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size), 3) )
@@ -118,3 +119,86 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
                 scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
     return partial_reconstructions_dict
 
+def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
+                            args):
+    """
+    Reconstructs the recognized features of the S1 layer by drawing
+    the features onto a black canvas with their intensity proportional to
+    the recognition strength.
+
+    Parameters:
+        
+        `target_img`: The target image
+
+        `layer_collection`: A dictionary containing for each layer name a list
+                            of those layers
+
+        `feature_imgs_dict`: A dictionary containing for each name the
+                             corresponding feature image
+
+        `args`: The commandline arguments object
+        
+    """
+    print('Reconstructing S1 features')
+    vis_img = np.zeros(target_img.shape)
+    vis_parts = visualization_parts(target_img.shape,
+                                    layer_collection['S1'],
+                                    feature_imgs_dict,
+                                    args.delta_i, args.delta_j)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            vis_img += img
+    cv2.imwrite('{}_S1_reconstruction.png'.format(plb.Path(args.target_name).stem),
+                                               vis_img)
+    
+def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
+                            args):
+    """
+    Reconstructs the recognized features of the C1 layer by drawing
+    the features onto a copy of the target_img, with their intensity
+    proportional to the recognition strength.
+
+    Arguments:
+
+        `target_img`: The target image
+
+        `layer_collection`: A dictionary containing for each layer name a list
+                            of those layers
+
+        `feature_imgs_dict`: A dictionary containing for each name the
+                             corresponding feature image
+
+        `args`: The commandline arguments object
+
+    """
+    print('Reconstructing C1 features')
+    # Create the RGB canvas to draw colored rectangles for the features
+    canvas = cv2.cvtColor(target_img, cv2.COLOR_GRAY2RGB)
+    # Create the colored squares for the features in a map
+    colored_squares_dict = {} # feature name -> colored square
+    # A set of predefined colors
+    colors = {'red': (255, 0, 0),
+              'green': (0, 255, 0),
+              'blue': (0, 0, 255),
+              'yellow': (255, 255, 0),
+              'purple': (255, 0, 255)}
+    color_iterator = colors.__iter__()
+    for feature_name, feature_img in feature_imgs_dict.items():
+        color_name = color_iterator.__next__()
+        f_n, f_m = feature_img.shape
+        bf_n = 6 * args.delta_i + f_m   # "big" f_n
+        bf_m = 6 * args.delta_j + f_m   # "big" f_m
+        # Create a square to cover all pixels of a C1 neuron
+        square = np.zeros((bf_n, bf_m, 3))
+        cv2.rectangle(square, (0, 0), (bf_n - 1, bf_m - 1), colors[color_name])
+        print('feature name and color: ', feature_name, color_name)
+        colored_squares_dict[feature_name] = square
+    vis_parts = visualization_parts(target_img.shape, layer_collection['C1'],
+                                    colored_squares_dict,
+                                    6 * args.delta_i,
+                                    6 * args.delta_j, canvas)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            cv2.imwrite('reconstruction_components/{}_{}_C1_{}_reconstruction.png'.\
+                        format(plb.Path(args.target_name).stem, size, feature_label),
+                        img)

@@ -155,7 +155,7 @@ def create_scale_invariance_layers_for(input_layer, weights_dict, args):
 
         `weights_dict`:
 
-        `args`:
+        `args`: The commandline arguments object
 
     Returns:
 
