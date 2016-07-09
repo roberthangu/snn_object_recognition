@@ -24,7 +24,10 @@ if args.plot_weights:
 # The training part is done. Go on with the "actual" simulation
 sim.setup(threads=4)
 
-target_img = cv2.imread(args.target_name, cv2.CV_8U)
+target_img = cm.read_and_prepare_img(args.target_name, args)
+cv2.imwrite('{}_{}_edges.png'.format(plb.Path(args.target_name).stem,
+                                     args.filter), target_img)
+
 layer_collection = {} # layer name -> list of S1 layers
 layer_collection['S1'] = nw.create_S1_layers(target_img, weights_dict,
                                              [1, 0.71, 0.5, 0.35, 0.25],
@@ -54,18 +57,19 @@ if args.reconstruct_c1_img:
                                 args)
 
 # Plot the spike trains of both neuron layers
-for layer_name, layer_dict in layer_collection.items():
-    for size, layers in layer_dict.items():
-        spike_panels = []
-        for layer in layers:
-            out_data = layer.population.get_data().segments[0]
-            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-                                          xticks=True, yticks=True,
-                                          xlabel='{}, {} scale layer'.format(\
-                                                    layer.population.label, size)))
-        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-                                                layer_name,
-                                                plb.Path(args.target_name).stem,
-                                                size))
+if args.plot_spikes:
+    for layer_name, layer_dict in layer_collection.items():
+        for size, layers in layer_dict.items():
+            spike_panels = []
+            for layer in layers:
+                out_data = layer.population.get_data().segments[0]
+                spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                                              xticks=True, yticks=True,
+                                              xlabel='{}, {} scale layer'.format(\
+                                                        layer.population.label, size)))
+            plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+                                                    layer_name,
+                                                    plb.Path(args.target_name).stem,
+                                                    size))
 
 sim.end()

@@ -1,8 +1,17 @@
 import argparse as ap
+import cv2
 
 def parse_args():
+    """
+    Defines the valid commandline options and the variables they are linked to.
+
+    Returns:
+
+        An object which contains the variables which correspond to the
+        commandline options.
+    """
     dflt_move=4
-    parser = ap.ArgumentParser(description='Invariance layer experiment')
+    parser = ap.ArgumentParser(description='SNN feature detector')
     parser.add_argument('--plot-weights', action='store_true',
                         help='Plots the learned feature weights and exits')
     parser.add_argument('-f', '--feature-dir', type=str, required=True,
@@ -22,6 +31,10 @@ def parse_args():
     parser.add_argument('--reconstruct-c1-img', action='store_true',
                         help='If set, draws a reconstruction of the recognized\
                         features from C1')
+    parser.add_argument('--plot-spikes', action='store_true',
+                        help='Plot the spike trains of all layers')
+    parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
+                        required=True, help='Sets the edge filter to be used')
     #parser.add_argument('-o', '--plot_img', type=str, required=True)
     #parser.add_argument('--plot_img', type=str, default='spikes_vert_line.png')
     parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
@@ -33,3 +46,26 @@ def parse_args():
     print(args)
     return args
 
+def read_and_prepare_img(target_name, args):
+    """
+    Reads the input image and performs the edge detector of the passed
+    commandline arguments on it
+
+    Returns:
+
+        The edges of the image
+    """
+    target_img = cv2.imread(target_name, cv2.CV_8U)
+    # Optionally resize the image to 300 pixels (or less) in height
+    blurred_img = cv2.GaussianBlur(target_img, (5, 5), 1.4)
+    filtered_img = None
+    if args.filter == 'none':
+        return target_img
+    if args.filter == 'canny':
+        filtered_img = cv2.Canny(blurred_img, 70, 210)
+    else:
+        dx = cv2.Sobel(blurred_img, cv2.CV_32F, 1, 0)
+        dy = cv2.Sobel(blurred_img, cv2.CV_32F, 0, 1)
+        edge_detected = cv2.sqrt(dx * dx + dy * dy)
+        filtered_img = cv2.convertScaleAbs(edge_detected)
+    return filtered_img
