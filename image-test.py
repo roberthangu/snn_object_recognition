@@ -24,7 +24,7 @@ if args.plot_weights:
 # The training part is done. Go on with the "actual" simulation
 sim.setup(threads=4)
 
-target_img = cm.read_and_prepare_img(args.target_name, args)
+target_img = cm.read_and_prepare_img(args.target_name, args.filter)
 cv2.imwrite('{}_{}_edges.png'.format(plb.Path(args.target_name).stem,
                                      args.filter), target_img)
 

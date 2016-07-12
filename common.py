@@ -12,13 +12,15 @@ def parse_args():
     """
     dflt_move=4
     parser = ap.ArgumentParser(description='SNN feature detector')
-    parser.add_argument('--plot-weights', action='store_true',
-                        help='Plots the learned feature weights and exits')
-    parser.add_argument('-f', '--feature-dir', type=str, required=True,
+    parser.add_argument('--feature-dir', type=str, required=True,
                         help='A directory where the features are stored as images')
-    parser.add_argument('-t', '--target-name', type=str, required=True,
+    parser.add_argument('--target-name', type=str, required=True,
                         help='The name of the already edge-filtered image to\
                             be recognized')
+    parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
+                        required=True, help='Sets the edge filter to be used')
+    parser.add_argument('--plot-weights', action='store_true',
+                        help='Plots the learned feature weights and exits')
     parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
                         help='The refractory period of neurons in the S1 layer in ms')
     parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
@@ -33,8 +35,6 @@ def parse_args():
                         features from C1')
     parser.add_argument('--plot-spikes', action='store_true',
                         help='Plot the spike trains of all layers')
-    parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
-                        required=True, help='Sets the edge filter to be used')
     #parser.add_argument('-o', '--plot_img', type=str, required=True)
     #parser.add_argument('--plot_img', type=str, default='spikes_vert_line.png')
     parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
@@ -46,22 +46,30 @@ def parse_args():
     print(args)
     return args
 
-def read_and_prepare_img(target_name, args):
+def read_and_prepare_img(target_name, filter_type):
     """
     Reads the input image and performs the edge detector of the passed
     commandline arguments on it
 
+    Arguments:
+
+        `target_name`: The name of the image to be read
+
+        `filter_type`: The filter to be applied to the target image. Can be one
+                       of 'canny', 'sobel' or 'none', if the image is to be
+                       used as-is.
+
     Returns:
 
-        The edges of the image
+        An image containing the edges of the target image 
     """
     target_img = cv2.imread(target_name, cv2.CV_8U)
     # Optionally resize the image to 300 pixels (or less) in height
     blurred_img = cv2.GaussianBlur(target_img, (5, 5), 1.4)
     filtered_img = None
-    if args.filter == 'none':
+    if filter_type == 'none':
         return target_img
-    if args.filter == 'canny':
+    if filter_type == 'canny':
         filtered_img = cv2.Canny(blurred_img, 70, 210)
     else:
         dx = cv2.Sobel(blurred_img, cv2.CV_32F, 1, 0)
