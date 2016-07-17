@@ -8,9 +8,6 @@ except ImportError:
     pass
 
 class Layer:
-    # TODO: In the future the layer class may also store other information, like
-    #       references to the layer before and after it. Think about a nice way
-    #       to represent the layers in this pipeline.
     """
     Represents a layer in the network architecture.
 
@@ -109,8 +106,9 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
     n = int((t_n - f_n) / delta_i) + ((t_n - f_n) % delta_i > 0) + 1
     m = int((t_m - f_m) / delta_j) + ((t_m - f_m) % delta_j > 0) + 1
     total_output_neurons = n * m
-    print('Number of output neurons {} for size {}x{}'.format(\
-                                            total_output_neurons, t_n, t_m))
+#    print('Number of output neurons {} for size {}x{}'.format(\
+#                                            total_output_neurons, t_n, t_m))
+    print('Layer:', layer_name)
     output_population = sim.Population(total_output_neurons,
                                        sim.IF_curr_exp(tau_refrac=refrac),
                                        label=layer_name)
@@ -144,22 +142,26 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
             k_out += 1
     return Layer(output_population, (n, m))
 
-def create_scale_invariance_layers_for(input_layer, weights_dict, args):
+def create_all_S1_layers_for(input_layer, weights_dict, args):
     """
     Takes an input spike source layer and a dict of weight arrays and creates an
-    output layer for each separate feature.
+    output layer for each separate feature. Uses the commandline arguments to
+    determine the horizontal and vertical deltas as well as the neuron
+    refractory period.
 
     Arguments:
 
-        `input_layer`:
+        `input_layer`: The spike source input layer
 
-        `weights_dict`:
+        `weights_dict`: A dictionary containing for each feature name a pair
+                        of a weight list and its shape
 
-        `args`: The commandline arguments object
+        `args`: The commandline arguments object. It uses the deltas and the
+                neuron refractory period from it
 
     Returns:
 
-        A list of layers.
+        A list of S1 layers.
     """
     invariance_layers = [] # list of layers
     for layer_name, weights_tuple in weights_dict.items():
@@ -209,19 +211,19 @@ def train_weights(feature_dir):
     sim.end()
     return (weights_dict, feature_imgs_dict)
 
-def create_S1_layers(target, weights_dict, input_scales, args, is_bag=False):
+def create_S1_layers(target, weights_dict, args, is_bag=False):
     """
-    Creates S1 layers for the given input scales
+    Creates S1 layers for the given input scales from the given commandline.
+    Also creates the spike input layer.
 
     Parameters:
 
         `target`: The target image or stream for which to create the S1 layers
 
-        `weights_dict`:
+        `weights_dict`: A dictionary containing for each feature name a pair
+                        of a weight list and its shape
 
-        `input_scales`: A list of scales for which to create a S1 layer
-
-        `args`: The commandline arguments
+        `args`: The commandline arguments. It uses the image scales from it
 
         `is_bag`: If set to True, the passed target will be treated as a rosbag,
                   otherwise as an image
@@ -231,7 +233,9 @@ def create_S1_layers(target, weights_dict, input_scales, args, is_bag=False):
         A dictionary containing for each size of the target a list of S1 layers
     """
     S1_layers = {} # input size -> list of S1 feature layers
-    for size in input_scales:
+    neuron_count = 0
+    for size in args.scales:
+        print('Create S1 layers for size', size)
         if is_bag:
             resized_target = stream.resize_stream(target, size)
             input_layer = create_spike_source_layer_from_stream(resized_target)
@@ -239,14 +243,19 @@ def create_S1_layers(target, weights_dict, input_scales, args, is_bag=False):
             resized_target = cv2.resize(src=target, dsize=None,
                                         fx=size, fy=size,
                                         interpolation=cv2.INTER_AREA)
-            print('resized target shape: ', resized_target.shape)
+#            print('resized target shape: ', resized_target.shape)
             # Create S1 layers for the current size
             input_layer = create_spike_source_layer_from(resized_target)
-        print('input population size: ', input_layer.population.size)
-        current_invariance_layers = create_scale_invariance_layers_for(\
-                                                      input_layer, weights_dict,
-                                                      args)
+            print('Input layer has {} neurons'.format(input_layer.shape[0] *
+                   input_layer.shape[1]))
+#        print('input population size: ', input_layer.population.size)
+        current_invariance_layers = create_all_S1_layers_for(input_layer,
+                                                             weights_dict, args)
         S1_layers[size] = current_invariance_layers
+
+        for layer in current_invariance_layers:
+            neuron_count += layer.shape[0] * layer.shape[1]
+    print('S1 layers have {} neurons'.format(neuron_count))
     return S1_layers
 
 def create_C1_layers(S1_layers_dict, refrac_c1):
@@ -265,6 +274,7 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         A dictionary containing for each size of S1 layers a list of C1 layers
     """
     C1_layers = {} # input size -> list of C1 layers
+    neuron_count = 0
     for size, S1_layers in S1_layers_dict.items():
         C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
@@ -274,10 +284,10 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
                          C1_subsampling_shape)
         for S1_layer in S1_layers:
-            print('creating C1 output layer')
             C1_output_layer = create_output_layer(S1_layer, weights_tuple,
                                    move_i, move_j, S1_layer.population.label,
                                    refrac_c1)
-            print('created layer')
             C1_layers[size].append(C1_output_layer)
+            neuron_count += C1_output_layer.shape[0] * C1_output_layer.shape[1]
+    print('C1 layers have {} neurons'.format(neuron_count))
     return C1_layers

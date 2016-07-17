@@ -1,5 +1,9 @@
 import argparse as ap
 import cv2
+import nest as sim
+import numpy as np
+import pickle
+import time
 
 def parse_args():
     """
@@ -16,9 +20,10 @@ def parse_args():
                         help='A directory where the features are stored as images')
     parser.add_argument('--target-name', type=str, required=True,
                         help='The name of the already edge-filtered image to\
-                            be recognized')
-    parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
-                        required=True, help='Sets the edge filter to be used')
+                              be recognized')
+    parser.add_argument('--filter', choices=['canny', 'sobel'],
+                        default='none', help='Sets the edge filter to be used.\
+                        Defaults to \'none\'')
     parser.add_argument('--plot-weights', action='store_true',
                         help='Plots the learned feature weights and exits')
     parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
@@ -35,13 +40,16 @@ def parse_args():
                         features from C1')
     parser.add_argument('--plot-spikes', action='store_true',
                         help='Plot the spike trains of all layers')
-    #parser.add_argument('-o', '--plot_img', type=str, required=True)
-    #parser.add_argument('--plot_img', type=str, default='spikes_vert_line.png')
     parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
                         help='The vertical distance between the basic recognizers')
     parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
                         help='The horizontal distance between the basic feature\
                         recognizers')
+    parser.add_argument('--scales', default=[1, 0.71, 0.5, 0.35, 0.25], nargs='+',
+                        type=float,
+                        help='A list of image scales for which to create\
+                        layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
+    parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
     args = parser.parse_args()
     print(args)
     return args

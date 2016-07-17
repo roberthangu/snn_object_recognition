@@ -1,5 +1,6 @@
 import numpy as np
 import pathlib as plb
+import pyNN.utility.plotting as plt
 import cv2
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
@@ -97,7 +98,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
         else:
             scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
         for layer in layers:
-            print('layer :', layer.population.label)
+            print('scale: {}, layer: {}'.format(size, layer.population.label))
             out_data = layer.population.get_data().segments[0]
             feature_label = layer.population.label
             feature_img = feature_imgs_dict[feature_label]
@@ -130,13 +131,15 @@ def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
         
         `target_img`: The target image
 
-        `layer_collection`: A dictionary containing for each layer name a list
-                            of those layers
+        `layer_collection`: A dictionary containing for each layer name a
+                            dictionary containing for each size a list of layers
+                            for all features
 
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
-        `args`: The commandline arguments object
+        `args`: The commandline arguments object. Uses the deltas and the target
+                image name from it
         
     """
     print('Reconstructing S1 features')
@@ -148,8 +151,8 @@ def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
     for size, img_pairs in vis_parts.items():
         for img, feature_label in img_pairs:
             vis_img += img
-    cv2.imwrite('{}_S1_reconstruction.png'.format(plb.Path(args.target_name).stem),
-                                               vis_img)
+    cv2.imwrite('S1_reconstructions/{}_S1_reconstruction.png'.format(\
+                                    plb.Path(args.target_name).stem), vis_img)
     
 def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
                             args):
@@ -168,7 +171,8 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
-        `args`: The commandline arguments object
+        `args`: The commandline arguments object. Uses the deltas and the target
+                image name from it
 
     """
     print('Reconstructing C1 features')
@@ -197,8 +201,40 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
                                     colored_squares_dict,
                                     6 * args.delta_i,
                                     6 * args.delta_j, canvas)
+    img_name_stem = plb.Path(args.target_name).stem
+    output_dir = plb.Path('C1_reconstructions/' + img_name_stem)
+    if not output_dir.exists():
+        output_dir.mkdir()
     for size, img_pairs in vis_parts.items():
         for img, feature_label in img_pairs:
-            cv2.imwrite('reconstruction_components/{}_{}_C1_{}_reconstruction.png'.\
-                        format(plb.Path(args.target_name).stem, size, feature_label),
-                        img)
+            cv2.imwrite(output_dir.as_posix() + '/{}_{}_C1_{}_reconstruction.png'.\
+                        format(img_name_stem, size, feature_label), img)
+
+def plot_spikes(layer_collection, args):
+    """
+    Plots the spikes of the layers in the given dictionary
+
+
+    Arguments:
+
+        `layer_collection`: A dictionary containing for each layer name a
+                            dictionary containing for each size of the target a
+                            list of S1 layers
+
+        `args`: The commandline arguments object. Uses the target image name
+                from it
+    """
+    for layer_name, layer_dict in layer_collection.items():
+        for size, layers in layer_dict.items():
+            spike_panels = []
+            for layer in layers:
+                out_data = layer.population.get_data().segments[0]
+                spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                                              xticks=True, yticks=True,
+                                              xlabel='{}, {} scale layer'.format(\
+                                                        layer.population.label, size)))
+            plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+                                                    layer_name,
+                                                    plb.Path(args.target_name).stem,
+                                                    size))
+    
