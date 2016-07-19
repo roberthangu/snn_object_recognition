@@ -224,8 +224,8 @@ def plot_spikes(layer_collection, args):
         `args`: The commandline arguments object. Uses the target image name
                 from it
     """
-    for layer_name, layer_dict in layer_collection.items():
-        for size, layers in layer_dict.items():
+    for layer_name in ['S1', 'C1']:
+        for size, layers in layer_collection[layer_name].items():
             spike_panels = []
             for layer in layers:
                 out_data = layer.population.get_data().segments[0]
@@ -237,4 +237,3 @@ def plot_spikes(layer_collection, args):
                                                     layer_name,
                                                     plb.Path(args.target_name).stem,
                                                     size))
-    

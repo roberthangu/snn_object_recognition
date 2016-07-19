@@ -2,6 +2,7 @@ import numpy as np
 import pyNN.nest as sim
 import cv2
 import pathlib as plb
+import time
 try:
     import stream
 except ImportError:
@@ -142,7 +143,7 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
             k_out += 1
     return Layer(output_population, (n, m))
 
-def create_all_S1_layers_for(input_layer, weights_dict, args):
+def create_all_feature_layers_for(input_layer, weights_dict, args):
     """
     Takes an input spike source layer and a dict of weight arrays and creates an
     output layer for each separate feature. Uses the commandline arguments to
@@ -211,31 +212,29 @@ def train_weights(feature_dir):
     sim.end()
     return (weights_dict, feature_imgs_dict)
 
-def create_S1_layers(target, weights_dict, args, is_bag=False):
+def create_input_layers_for_scales(target, scales, is_bag=False):
     """
-    Creates S1 layers for the given input scales from the given commandline.
-    Also creates the spike input layer.
+    Creates for a given target image and a list of scales a list of input spike
+    layers one for each size.
 
     Parameters:
 
-        `target`: The target image or stream for which to create the S1 layers
+        `target`: The target image or stream from which to create the input
+                  layers
 
-        `weights_dict`: A dictionary containing for each feature name a pair
-                        of a weight list and its shape
-
-        `args`: The commandline arguments. It uses the image scales from it
+        `scales`: A list of scales for which to create input layers
 
         `is_bag`: If set to True, the passed target will be treated as a rosbag,
                   otherwise as an image
 
     Returns:
 
-        A dictionary containing for each size of the target a list of S1 layers
+        A list of input spike layers created from the given target, one for each
+        scale
     """
-    S1_layers = {} # input size -> list of S1 feature layers
+    input_layers = {}
     neuron_count = 0
-    for size in args.scales:
-        print('Create S1 layers for size', size)
+    for size in scales:
         if is_bag:
             resized_target = stream.resize_stream(target, size)
             input_layer = create_spike_source_layer_from_stream(resized_target)
@@ -244,18 +243,50 @@ def create_S1_layers(target, weights_dict, args, is_bag=False):
                                         fx=size, fy=size,
                                         interpolation=cv2.INTER_AREA)
 #            print('resized target shape: ', resized_target.shape)
-            # Create S1 layers for the current size
+            t1 = time.clock()
             input_layer = create_spike_source_layer_from(resized_target)
-            print('Input layer has {} neurons'.format(input_layer.shape[0] *
-                   input_layer.shape[1]))
-#        print('input population size: ', input_layer.population.size)
-        current_invariance_layers = create_all_S1_layers_for(input_layer,
+            print('Input layer creation for scale () took {} s'.format(size,
+                                                             time.clock() - t1))
+            print('Input layer for scale {} has {} neurons'.format(size,
+                                   input_layer.shape[0] * input_layer.shape[1]))
+        input_layers[size] = input_layer
+    return input_layers
+
+def create_S1_layers(input_layers_dict, weights_dict, args):
+    """
+    Creates S1 layers for the given input layers. It creates for each input
+    layer a S1 layer for each feature in the weights_dict
+
+    Parameters:
+
+        `input_layers_dict`: A dictionary of input layers for which to create
+                             the S1 layers for all features in the weights_dict.
+                             It stores for each size the corresponding input
+                             layer
+
+        `weights_dict`: A dictionary containing for each feature name a pair
+                        of a weight list and its shape
+
+        `args`: The commandline arguments
+
+    Returns:
+
+        A dictionary containing for each size of the target a list of S1 layers
+    """
+    S1_layers = {} # input size -> list of S1 feature layers
+    for size, input_layer in input_layers_dict.items():
+        print('Create S1 layers for size', size)
+        neuron_count = 0
+        t1 = time.clock()
+        current_invariance_layers = create_all_feature_layers_for(input_layer,
                                                              weights_dict, args)
+        print('S1 layer creation for scale {} took {} s'.format(size,
+                                                            time.clock() - t1))
         S1_layers[size] = current_invariance_layers
 
         for layer in current_invariance_layers:
             neuron_count += layer.shape[0] * layer.shape[1]
-    print('S1 layers have {} neurons'.format(neuron_count))
+        print('S1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return S1_layers
 
 def create_C1_layers(S1_layers_dict, refrac_c1):
@@ -274,8 +305,8 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         A dictionary containing for each size of S1 layers a list of C1 layers
     """
     C1_layers = {} # input size -> list of C1 layers
-    neuron_count = 0
     for size, S1_layers in S1_layers_dict.items():
+        neuron_count = 0
         C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
@@ -283,11 +314,14 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         C1_weight = 5
         weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
                          C1_subsampling_shape)
+        t1 = time.clock()
         for S1_layer in S1_layers:
             C1_output_layer = create_output_layer(S1_layer, weights_tuple,
                                    move_i, move_j, S1_layer.population.label,
                                    refrac_c1)
             C1_layers[size].append(C1_output_layer)
             neuron_count += C1_output_layer.shape[0] * C1_output_layer.shape[1]
-    print('C1 layers have {} neurons'.format(neuron_count))
+        print('C1 layer creation for scale {} took {} s'.format(size,
+                                                            time.clock() - t1))
+        print('C1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return C1_layers

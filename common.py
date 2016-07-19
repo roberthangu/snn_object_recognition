@@ -45,8 +45,8 @@ def parse_args():
     parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
                         help='The horizontal distance between the basic feature\
                         recognizers')
-    parser.add_argument('--scales', default=[1, 0.71, 0.5, 0.35, 0.25], nargs='+',
-                        type=float,
+    parser.add_argument('--scales', default=[1.0, 0.71, 0.5, 0.35, 0.25],
+                        nargs='+', type=float,
                         help='A list of image scales for which to create\
                         layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
     parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')

@@ -26,24 +26,26 @@ if args.plot_weights:
 sim.setup(threads=4)
 
 target_img = cm.read_and_prepare_img(args.target_name, args.filter)
-cv2.imwrite('{}_{}_edges.png'.format(plb.Path(args.target_name).stem,
-                                     args.filter), target_img)
+if args.filter != 'none':
+    cv2.imwrite('edges/{}_{}_edges.png'.format(plb.Path(args.target_name).stem,
+                                         args.filter), target_img)
 
-layer_collection = {} # layer name -> list of S1 layers
-# TODO make an extra entry here with the spike source layer. This is needed to
-#      set new firing rates when processing a video
+layer_collection = {} # layer name -> dict of S1 layers of type
+                      # 'scale -> layer list'
+layer_collection['input'] = nw.create_input_layers_for_scales(target_img,
+                                                             args.scales)
 t1 = time.clock()
-layer_collection['S1'] = nw.create_S1_layers(target_img, weights_dict, args)
-t2 = time.clock()
-print('S1 creation took {} s'.format(t2 - t1))
+layer_collection['S1'] = nw.create_S1_layers(layer_collection['input'],
+                                             weights_dict, args)
+print('S1 creation took {} s'.format(time.clock() - t1))
 if not args.no_c1:
     print('Create C1 layers')
     layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
                                                  args.refrac_c1)
     print('C1 creation took {} s'.format(time.clock() - t2))
 
-for layer_dict in layer_collection.values():
-    for layers in layer_dict.values():
+for layer_name in ['S1', 'C1']:
+    for layers in layer_collection[layer_name].values():
         for layer in layers:
             layer.population.record('spikes')
 
@@ -69,6 +71,7 @@ if args.reconstruct_c1_img:
 
 t1 = time.clock()
 if args.plot_spikes:
+    print('Plotting spikes')
     vis.plot_spikes(layer_collection, args)
     print('Plotting spiketrains took {} s'.format(time.clock() - t1))
 
