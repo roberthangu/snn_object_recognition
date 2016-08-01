@@ -17,11 +17,26 @@ class Layer:
         `population`: The pyNN neuron population of the layer
 
         `shape`:      The shape of the layer as a tuple of (rows, cols)
+
+        `current_spike_counts`: The spike counts which are generated from one
+                                simulation run to the next
     """
 
     def __init__(self, population, shape):
         self.population = population
         self.shape = shape
+        self.current_spike_counts = [0] * population.size
+
+    def update_spike_counts(self):
+        """
+        Updates the spike counts inside self.current_spike_counts to reflect the
+        latest simulation advancement. That is, to store the spike counts from
+        the previous simulation to the current one.
+        """
+        spike_counts = self.population.get_spike_counts()
+        for i in range(self.population.size):
+            self.current_spike_counts[i] =\
+                spike_counts[self.population[i]] - self.current_spike_counts[i]
 
 def create_spike_source_layer_from(source_np_array):
     """
@@ -245,7 +260,7 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
 #            print('resized target shape: ', resized_target.shape)
             t1 = time.clock()
             input_layer = create_spike_source_layer_from(resized_target)
-            print('Input layer creation for scale () took {} s'.format(size,
+            print('Input layer creation for scale {} took {} s'.format(size,
                                                              time.clock() - t1))
             print('Input layer for scale {} has {} neurons'.format(size,
                                    input_layer.shape[0] * input_layer.shape[1]))

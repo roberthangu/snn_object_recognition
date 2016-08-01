@@ -1,6 +1,5 @@
 import argparse as ap
 import cv2
-import nest as sim
 import numpy as np
 import pickle
 import time
@@ -10,7 +9,6 @@ def parse_args():
     Defines the valid commandline options and the variables they are linked to.
 
     Returns:
-
         An object which contains the variables which correspond to the
         commandline options.
     """
@@ -21,7 +19,7 @@ def parse_args():
     parser.add_argument('--target-name', type=str, required=True,
                         help='The name of the already edge-filtered image to\
                               be recognized')
-    parser.add_argument('--filter', choices=['canny', 'sobel'],
+    parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
                         default='none', help='Sets the edge filter to be used.\
                         Defaults to \'none\'')
     parser.add_argument('--plot-weights', action='store_true',
@@ -54,25 +52,20 @@ def parse_args():
     print(args)
     return args
 
-def read_and_prepare_img(target_name, filter_type):
+def filter_img(target_img, filter_type):
     """
-    Reads the input image and performs the edge detector of the passed
-    commandline arguments on it
+    Performs the given edge detector on the given image
 
     Arguments:
-
-        `target_name`: The name of the image to be read
+        `target_img`: The image to detect edges from
 
         `filter_type`: The filter to be applied to the target image. Can be one
                        of 'canny', 'sobel' or 'none', if the image is to be
                        used as-is.
 
     Returns:
-
         An image containing the edges of the target image 
     """
-    target_img = cv2.imread(target_name, cv2.CV_8U)
-    # Optionally resize the image to 300 pixels (or less) in height
     blurred_img = cv2.GaussianBlur(target_img, (5, 5), 1.4)
     filtered_img = None
     if filter_type == 'none':
@@ -85,3 +78,56 @@ def read_and_prepare_img(target_name, filter_type):
         edge_detected = cv2.sqrt(dx * dx + dy * dy)
         filtered_img = cv2.convertScaleAbs(edge_detected)
     return filtered_img
+    
+
+def read_and_prepare_img(target_name, filter_type):
+    """
+    Reads the input image and performs the edge detector of the passed
+    commandline arguments on it
+
+    Arguments:
+        `target_name`: The name of the image to be read
+
+        `filter_type`: The filter to be applied to the target image. Can be one
+                       of 'canny', 'sobel' or 'none', if the image is to be
+                       used as-is.
+
+    Returns:
+        An image containing the edges of the target image 
+    """
+    target_img = cv2.imread(target_name, cv2.CV_8U)
+    # Optionally resize the image to 300 pixels (or less) in height
+    return filter_img(target_img, filter_type)
+
+def float_to_fourcc_string(x):
+    """
+    Converns a float to its fourcc number as a string.
+
+    Parameters:
+        `x`: The float as returned by cv2.VideoCapture.get(cv2.CAP_PROP_FOURCC)
+
+    Returns:
+        The used encoder extension as a string
+    """
+    x = int(x)
+    c1 = chr(x & 0xFF)
+    c2 = chr((x & 0xFF00) >> 8)
+    c3 = chr((x & 0xFF0000) >> 16)
+    c4 = chr((x & 0xFF000000) >> 24)
+    return c1 + c2 + c3 + c4
+
+def fourcc_string_to_int(s):
+    """
+    Converns a fourcc string to a float 
+
+    Parameters:
+        `s`: The fourcc string to be converted
+
+    Returns:
+        A float representing the code for the given codec string
+    """
+    n1 = ord(s[0])
+    n2 = ord(s[1])
+    n3 = ord(s[2])
+    n4 = ord(s[3])
+    return (n4 << 24) + (n3 << 16) + (n2 << 8) + n1

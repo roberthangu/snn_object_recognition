@@ -56,6 +56,11 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
+for layer_name in ['S1', 'C1']:
+    for layers in layer_collection[layer_name].values():
+        for layer in layers:
+            layer.update_spike_counts()
+
 t1 = time.clock()
 if args.reconstruct_s1_img:
     vis.reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,

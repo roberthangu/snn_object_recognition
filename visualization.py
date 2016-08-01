@@ -85,10 +85,10 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
     max_firing = 1
     for size, layers in layers_dict.items():
         for layer in layers:
-            spiketrains = layer.population.get_data().segments[0].spiketrains
-            for spiketrain in spiketrains:
-                if len(spiketrain) > max_firing:
-                    max_firing = len(spiketrain)
+            spike_counts = layer.current_spike_counts
+            for count in spike_counts:
+                if count > max_firing:
+                    max_firing = count
     partial_reconstructions_dict = {}   # size -> list of pairs of reconstructed
                                         # images and their feature name
     for size, layers in layers_dict.items():
@@ -99,14 +99,14 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
             scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
         for layer in layers:
             print('scale: {}, layer: {}'.format(size, layer.population.label))
-            out_data = layer.population.get_data().segments[0]
+            spike_counts = layer.current_spike_counts
             feature_label = layer.population.label
             feature_img = feature_imgs_dict[feature_label]
             st_n = scaled_vis_img.shape[0]
             st_m = scaled_vis_img.shape[1]
-            for i in range(len(out_data.spiketrains)):
+            for i in range(layer.population.size):
                 # each spiketrain corresponds to a layer S1 output neuron
-                copy_to_visualization(i, len(out_data.spiketrains[i]) / max_firing,
+                copy_to_visualization(i, spike_counts[i] / max_firing,
                                       feature_img, scaled_vis_img, layer.shape,
                                       delta_i, delta_j)
             upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
