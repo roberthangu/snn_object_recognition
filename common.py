@@ -50,6 +50,8 @@ def parse_args():
     parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
     parser.add_argument('--video', action='store_true',
                         help='Set this flag if reading a video file')
+    parser.add_argument('--frames', default=10, type=int,
+                        help='The number of video frames to be processed')
     args = parser.parse_args()
     print(args)
     return args

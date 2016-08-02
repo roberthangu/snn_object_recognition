@@ -136,7 +136,7 @@ def create_S1_feature_image(target_img, layer_collection, feature_imgs_dict,
                                     layer_collection['S1'],
                                     feature_imgs_dict,
                                     args.delta_i, args.delta_j)
-    for size, img_pairs in vis_parts.items():
+    for img_pairs in vis_parts.values():
         for img, feature_label in img_pairs:
             vis_img += img
     img_name = 'S1_reconstructions/{}_S1_reconstruction.png'.format(\
