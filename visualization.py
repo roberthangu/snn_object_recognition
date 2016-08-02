@@ -120,6 +120,29 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
                 scaled_vis_img = np.zeros( (round(t_n * size), round(t_m * size)) )
     return partial_reconstructions_dict
 
+def create_S1_feature_image(target_img, layer_collection, feature_imgs_dict,
+                            args):
+    """
+    Creates the S1 reconstruction of an image. This is a helper function of
+    reconstruct_S1_features() with the same parameter meaning.
+
+    Returns:
+        A pair consisting of the name under which to write the image and the
+        reconstructed image.
+    """
+    print('Reconstructing S1 features')
+    vis_img = np.zeros(target_img.shape)
+    vis_parts = visualization_parts(target_img.shape,
+                                    layer_collection['S1'],
+                                    feature_imgs_dict,
+                                    args.delta_i, args.delta_j)
+    for size, img_pairs in vis_parts.items():
+        for img, feature_label in img_pairs:
+            vis_img += img
+    img_name = 'S1_reconstructions/{}_S1_reconstruction.png'.format(\
+                                    plb.Path(args.target_name).stem)
+    return (img_name, vis_img)
+
 def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
                             args):
     """
@@ -142,17 +165,9 @@ def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
                 image name from it
         
     """
-    print('Reconstructing S1 features')
-    vis_img = np.zeros(target_img.shape)
-    vis_parts = visualization_parts(target_img.shape,
-                                    layer_collection['S1'],
-                                    feature_imgs_dict,
-                                    args.delta_i, args.delta_j)
-    for size, img_pairs in vis_parts.items():
-        for img, feature_label in img_pairs:
-            vis_img += img
-    cv2.imwrite('S1_reconstructions/{}_S1_reconstruction.png'.format(\
-                                    plb.Path(args.target_name).stem), vis_img)
+    img_name, vis_img = create_S1_feature_image(target_img, layer_collection,
+                                                feature_imgs_dict, args)
+    cv2.imwrite(img_name, vis_img)
     
 def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
                             args):

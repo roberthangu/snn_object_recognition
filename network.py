@@ -26,6 +26,7 @@ class Layer:
         self.population = population
         self.shape = shape
         self.current_spike_counts = [0] * population.size
+        self.old_spike_counts = [0] * population.size
 
     def update_spike_counts(self):
         """
@@ -36,7 +37,29 @@ class Layer:
         spike_counts = self.population.get_spike_counts()
         for i in range(self.population.size):
             self.current_spike_counts[i] =\
-                spike_counts[self.population[i]] - self.current_spike_counts[i]
+                spike_counts[self.population[i]] - self.old_spike_counts[i]
+            self.old_spike_counts[i] = spike_counts[self.population[i]]
+
+def set_spike_source_layer_rates(layer, source_np_array):
+    """
+    Sets the firing rates of the already created spike source layer to the
+    given source_np_array. This is also a helper function of
+    create_spike_source_layer_from().
+    """
+    reshaped_array = source_np_array.ravel()
+    rates = []
+    for rate in reshaped_array:
+        rates.append(int(rate / 4))
+    layer.population.set(rate=rates)
+
+def create_empty_spike_source_layer_with_shape(shape):
+    """
+    Creates a spike source layer with the given shape and its firing rates set
+    to zero. This is also a helper function of create_spike_source_layer_from().
+    """
+    spike_source_layer = sim.Population(size=shape[0] * shape[1],
+                                   cellclass=sim.SpikeSourcePoisson(rate=0))
+    return Layer(spike_source_layer, shape)
 
 def create_spike_source_layer_from(source_np_array):
     """
@@ -44,13 +67,9 @@ def create_spike_source_layer_from(source_np_array):
     image intensities in spikes. The size of the spike source layer is the
     number of pixels in the image.
     """
-    reshaped_array = source_np_array.ravel()
-    rates = []
-    for rate in reshaped_array:
-        rates.append(int(rate / 4))
-    spike_source_layer = sim.Population(size=len(rates),
-                                   cellclass=sim.SpikeSourcePoisson(rate=rates))
-    return Layer(spike_source_layer, source_np_array.shape)
+    layer = create_empty_spike_source_layer_with_shape(source_np_array.shape)
+    set_spike_source_layer_rates(layer, source_np_array)
+    return layer
 
 def create_spike_source_layer_from_stream(stream):
     nNeurons = stream.shape[0] * stream.shape[1]
@@ -227,6 +246,17 @@ def train_weights(feature_dir):
     sim.end()
     return (weights_dict, feature_imgs_dict)
 
+def change_rates_for_scales(input_layers, target):
+    """
+    Sets the rates of the given input layers according to the values of the
+    target image.
+    """
+    for size, layer in input_layers.items():
+        resized_target = cv2.resize(src=target, dsize=None,
+                                    fx=size, fy=size,
+                                    interpolation=cv2.INTER_AREA)
+        set_spike_source_layer_rates(layer, resized_target)
+
 def create_input_layers_for_scales(target, scales, is_bag=False):
     """
     Creates for a given target image and a list of scales a list of input spike
@@ -248,23 +278,26 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
         scale
     """
     input_layers = {}
-    neuron_count = 0
+    bag_input_layers = {}
+    t_n = target.shape[0]
+    t_m = target.shape[1]
     for size in scales:
         if is_bag:
             resized_target = stream.resize_stream(target, size)
-            input_layer = create_spike_source_layer_from_stream(resized_target)
+            bag_input_layers[size] =\
+                 create_spike_source_layer_from_stream(resized_target)
         else:
-            resized_target = cv2.resize(src=target, dsize=None,
-                                        fx=size, fy=size,
-                                        interpolation=cv2.INTER_AREA)
-#            print('resized target shape: ', resized_target.shape)
             t1 = time.clock()
-            input_layer = create_spike_source_layer_from(resized_target)
+            input_layer = create_empty_spike_source_layer_with_shape(\
+                                       ( round(t_n * size), round(t_m * size) ))
             print('Input layer creation for scale {} took {} s'.format(size,
                                                              time.clock() - t1))
             print('Input layer for scale {} has {} neurons'.format(size,
                                    input_layer.shape[0] * input_layer.shape[1]))
-        input_layers[size] = input_layer
+            input_layers[size] = input_layer
+    if is_bag:
+        return bag_input_layers
+    change_rates_for_scales(input_layers, target)
     return input_layers
 
 def create_S1_layers(input_layers_dict, weights_dict, args):

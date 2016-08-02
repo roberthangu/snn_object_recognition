@@ -48,6 +48,8 @@ def parse_args():
                         help='A list of image scales for which to create\
                         layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
     parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
+    parser.add_argument('--video', action='store_true',
+                        help='Set this flag if reading a video file')
     args = parser.parse_args()
     print(args)
     return args

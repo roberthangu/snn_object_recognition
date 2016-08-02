@@ -15,8 +15,7 @@ args = cm.parse_args()
 
 t1 = time.clock()
 weights_dict, feature_imgs_dict = nw.train_weights(args.feature_dir)
-t2 = time.clock()
-print('Training weights took {} s'.format(t2 - t1))
+print('Training weights took {} s'.format(time.clock() - t1))
 
 if args.plot_weights:
     vis.plot_weights(weights_dict)
@@ -39,10 +38,11 @@ layer_collection['S1'] = nw.create_S1_layers(layer_collection['input'],
                                              weights_dict, args)
 print('S1 creation took {} s'.format(time.clock() - t1))
 if not args.no_c1:
+    t1 = time.clock()
     print('Create C1 layers')
     layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
                                                  args.refrac_c1)
-    print('C1 creation took {} s'.format(time.clock() - t2))
+    print('C1 creation took {} s'.format(time.clock() - t1))
 
 for layer_name in ['S1', 'C1']:
     for layers in layer_collection[layer_name].values():
