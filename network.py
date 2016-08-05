@@ -1,5 +1,6 @@
 import numpy as np
 import pyNN.nest as sim
+import pyNN.space as space
 import cv2
 import pathlib as plb
 import time
@@ -128,8 +129,8 @@ def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
 def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
                         layer_name, refrac):
     """
-    Builds a layer which creates an output layer which connects to the
-    input_layer according to the given parameters.
+    Builds a layer which connects to the input_layer according to the given
+    parameters.
     """
     weights = weights_tuple[0]
     f_n, f_m = weights_tuple[1]
@@ -146,6 +147,7 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
     print('Layer:', layer_name)
     output_population = sim.Population(total_output_neurons,
                                        sim.IF_curr_exp(tau_refrac=refrac),
+                                       structure=space.Grid2D(aspect_ratio=m/n),
                                        label=layer_name)
 
     # Go through the lines of the image and connect input neurons to the
@@ -198,12 +200,12 @@ def create_all_feature_layers_for(input_layer, weights_dict, args):
 
         A list of S1 layers.
     """
-    invariance_layers = [] # list of layers
+    feature_layers = [] # list of layers
     for layer_name, weights_tuple in weights_dict.items():
-        invariance_layers.append(create_output_layer(input_layer, weights_tuple,
+        feature_layers.append(create_output_layer(input_layer, weights_tuple,
                                                      args.delta_i, args.delta_j,
                                                      layer_name, args.refrac_s1))
-    return invariance_layers
+    return feature_layers
 
 def create_corner_layer_for(input_layers):
     shape = input_layers[0].shape
@@ -320,7 +322,7 @@ def create_cross_layer_inhibition(layers_dict):
 
     print('Create inhibitory connections')
     for size, layers in layers_dict.items():
-        print('Size', size)
+        print('Create cross layer inhibiton for size', size)
         inhibitory_connect(layers, 0, 1, 2, 3, -50)
         inhibitory_connect(layers, 1, 0, 2, 3, -50)
         inhibitory_connect(layers, 2, 0, 1, 3, -50)
@@ -362,6 +364,23 @@ def create_S1_layers(input_layers_dict, weights_dict, args):
             neuron_count += layer.shape[0] * layer.shape[1]
         print('S1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return S1_layers
+
+def create_local_inhibition(layers_dict):
+    """
+    Creates local inhibitory connections from a neuron to its neighbors in an
+    area of a fixed distance. The latency of its neighboring neurons decreases
+    linearly with the distance from the spike from 15% to 5%, as described in
+    Masquelier's paper. Here we assumed that a weight of -10 inhibits the
+    neuron completely and took that as a starting point.
+    """
+    for size, layers in layers_dict.items():
+        print('Create local inhibition for size', size)
+        for layer in layers:
+            sim.Projection(layer.population, layer.population,
+                sim.DistanceDependentProbabilityConnector('d < 5',
+                    allow_self_connections=False),
+                sim.StaticSynapse(weight='.25 * d - 1.75'),
+                space=space.Space(axes='xy')) 
 
 def create_C1_layers(S1_layers_dict, refrac_c1):
     """

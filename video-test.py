@@ -34,6 +34,7 @@ layer_collection['input'] = nw.create_input_layers_for_scales(\
                                 np.zeros((cap_height, cap_width)), args.scales)
 layer_collection['S1'] = nw.create_S1_layers(layer_collection['input'],
                                              weights_dict, args)
+nw.create_cross_layer_inhibition(layer_collection['S1'])
 # We build only the S1 layer for the moment, to speed up the simulation time
 
 for layers in layer_collection['S1'].values():

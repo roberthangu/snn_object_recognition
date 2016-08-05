@@ -46,6 +46,7 @@ if not args.no_c1:
     print('Create C1 layers')
     layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
                                                  args.refrac_c1)
+    nw.create_local_inhibition(layer_collection['C1'])
     print('C1 creation took {} s'.format(time.clock() - t1))
 
 for layer_name in ['S1', 'C1']:
