@@ -240,15 +240,16 @@ def plot_spikes(layer_collection, args):
                 from it
     """
     for layer_name in ['S1', 'C1']:
-        for size, layers in layer_collection[layer_name].items():
-            spike_panels = []
-            for layer in layers:
-                out_data = layer.population.get_data().segments[0]
-                spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-                                              xticks=True, yticks=True,
-                                              xlabel='{}, {} scale layer'.format(\
-                                                        layer.population.label, size)))
-            plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-                                                    layer_name,
-                                                    plb.Path(args.target_name).stem,
-                                                    size))
+        if layer_name in layer_collection:
+            for size, layers in layer_collection[layer_name].items():
+                spike_panels = []
+                for layer in layers:
+                    out_data = layer.population.get_data().segments[0]
+                    spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                                                  xticks=True, yticks=True,
+                                                  xlabel='{}, {} scale layer'.format(\
+                                                            layer.population.label, size)))
+                plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
+                                                        layer_name,
+                                                        plb.Path(args.target_name).stem,
+                                                        size))

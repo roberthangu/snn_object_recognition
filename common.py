@@ -14,44 +14,42 @@ def parse_args():
     """
     dflt_move=4
     parser = ap.ArgumentParser(description='SNN feature detector')
+    parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
+                        help='The vertical distance between the basic recognizers')
+    parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
+                        help='The horizontal distance between the basic feature\
+                        recognizers')
     parser.add_argument('--feature-dir', type=str, required=True,
                         help='A directory where the features are stored as images')
-    parser.add_argument('--target-name', type=str, required=True,
-                        help='The name of the already edge-filtered image to\
-                              be recognized')
     parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
                         default='none', help='Sets the edge filter to be used.\
                         Defaults to \'none\'')
+    parser.add_argument('--frames', default=10, type=int,
+                        help='The number of video frames to be processed')
+    parser.add_argument('--no-c1', action='store_true',
+                        help='Disables the creation of C1 layers')
+    parser.add_argument('--plot-spikes', action='store_true',
+                        help='Plot the spike trains of all layers')
     parser.add_argument('--plot-weights', action='store_true',
                         help='Plots the learned feature weights and exits')
     parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
                         help='The refractory period of neurons in the S1 layer in ms')
     parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
                         help='The refractory period of neurons in the C1 layer in ms')
-    parser.add_argument('--no-c1', action='store_true',
-                        help='Disables the creation of C1 layers')
     parser.add_argument('--reconstruct-s1-img', action='store_true',
                         help='If set, draws a reconstruction of the recognized\
                         features from S1')
     parser.add_argument('--reconstruct-c1-img', action='store_true',
                         help='If set, draws a reconstruction of the recognized\
                         features from C1')
-    parser.add_argument('--plot-spikes', action='store_true',
-                        help='Plot the spike trains of all layers')
-    parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
-                        help='The vertical distance between the basic recognizers')
-    parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
-                        help='The horizontal distance between the basic feature\
-                        recognizers')
     parser.add_argument('--scales', default=[1.0, 0.71, 0.5, 0.35, 0.25],
                         nargs='+', type=float,
                         help='A list of image scales for which to create\
                         layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
     parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
-    parser.add_argument('--video', action='store_true',
-                        help='Set this flag if reading a video file')
-    parser.add_argument('--frames', default=10, type=int,
-                        help='The number of video frames to be processed')
+    parser.add_argument('--target-name', type=str, required=True,
+                        help='The name of the already edge-filtered image to\
+                              be recognized')
     args = parser.parse_args()
     print(args)
     return args

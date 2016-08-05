@@ -300,6 +300,32 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
     change_rates_for_scales(input_layers, target)
     return input_layers
 
+def create_cross_layer_inhibition(layers_dict):
+    """
+    Creates inhibitory connections between the given feature layers for each
+    size to allow only the spikes of the strongest feature to be propagated
+    further
+
+    Parameters:
+        
+        `layers_dict`: A dictionary of layers of the type size -> list of layers
+    """
+    def inhibitory_connect(layers, source, dest1, dest2, dest3, weight):
+        sim.Projection(layers[source].population, layers[dest1].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+        sim.Projection(layers[source].population, layers[dest2].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+        sim.Projection(layers[source].population, layers[dest3].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+
+    print('Create inhibitory connections')
+    for size, layers in layers_dict.items():
+        print('Size', size)
+        inhibitory_connect(layers, 0, 1, 2, 3, -50)
+        inhibitory_connect(layers, 1, 0, 2, 3, -50)
+        inhibitory_connect(layers, 2, 0, 1, 3, -50)
+        inhibitory_connect(layers, 3, 0, 1, 2, -50)
+
 def create_S1_layers(input_layers_dict, weights_dict, args):
     """
     Creates S1 layers for the given input layers. It creates for each input
