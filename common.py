@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
                         help='The horizontal distance between the basic feature\
                         recognizers')
-    parser.add_argument('--feature-dir', type=str, required=True,
+    parser.add_argument('--feature-dir', type=str,
                         help='A directory where the features are stored as images')
     parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
                         default='none', help='Sets the edge filter to be used.\
@@ -75,12 +75,32 @@ def filter_img(target_img, filter_type):
     if filter_type == 'canny':
         filtered_img = cv2.Canny(blurred_img, 70, 210)
     else:
-        dx = cv2.Sobel(blurred_img, cv2.CV_32F, 1, 0)
-        dy = cv2.Sobel(blurred_img, cv2.CV_32F, 0, 1)
+        dx = cv2.Sobel(blurred_img, cv2.CV_64F, 1, 0)
+        dy = cv2.Sobel(blurred_img, cv2.CV_64F, 0, 1)
         edge_detected = cv2.sqrt(dx * dx + dy * dy)
         filtered_img = cv2.convertScaleAbs(edge_detected)
     return filtered_img
     
+def get_gabor_edges(target_img):
+    """
+    Computes the gabor filtered images for four orientations for the given
+    unfiltered image
+
+    Parameters:
+        `target_img`: The original target image
+
+    Returns:
+        A dictionary which contains for each name the corresponding filtered
+        image
+    """
+    angles = [np.pi / 8, np.pi / 4 + np.pi / 8, np.pi / 2 +  np.pi / 8,
+              3 * np.pi / 4 + np.pi / 8]
+    feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
+    return dict([(name,
+                  cv2.convertScaleAbs(\
+                    cv2.filter2D(target_img, cv2.CV_64F,
+                              cv2.getGaborKernel((5, 5), 1.4, angle, 5, 1))))\
+                  for name, angle in zip(feature_names, angles)])
 
 def read_and_prepare_img(target_name, filter_type):
     """

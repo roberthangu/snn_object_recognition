@@ -4,6 +4,7 @@ import pyNN.space as space
 import cv2
 import pathlib as plb
 import time
+import common as cm
 try:
     import stream
 except ImportError:
@@ -301,6 +302,64 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
         return bag_input_layers
     change_rates_for_scales(input_layers, target)
     return input_layers
+
+def create_gabor_input_layers_for_scales(target, scales):
+    """
+    Creates input layers from the given image by using gabor filters in four
+    orientations
+
+    Parameters:
+        `target`: The target image from which to compute the gabor filters and
+                  create the input layers
+
+        `scales`: A list of the scales for which to create input layers
+
+    Returns:
+        A dictionary which contains for each scale a list of four input layers,
+        one for each orientation
+    """
+    input_layers = {}
+    for size in scales:
+        print('Creating input layers for size', size)
+        resized_target = cv2.resize(src=target, dsize=None, fx=size, fy=size,
+                                    interpolation=cv2.INTER_AREA)
+        current_feature_layers = []
+        for name, edge_img in cm.get_gabor_edges(resized_target).items():
+            layer = create_spike_source_layer_from(edge_img)
+            layer.population.label=name
+            current_feature_layers.append(layer)
+        input_layers[size] = current_feature_layers
+    return input_layers
+
+def create_gabor_S1_layers(input_layers_dict):
+    """
+    Create for each input layer a S1 layer which has a one-to-one connection to
+    it
+
+    Parameters:
+        `input_layers_dict`: A dictionary containing for each size a list of
+                             input layers, for each feature one
+
+    Returns:
+        A dictionary containing for each size a list with the S1 layers
+    """
+    S1_layers = {}
+    for size, layers in input_layers_dict.items():
+        current_layers = []
+        for input_layer in layers:
+            layer_name = input_layer.population.label
+            print('Create S1 layer for size', size, 'feature', layer_name)
+            new_layer = Layer(sim.Population(input_layer.population.size, 
+                                             sim.IF_curr_exp(),
+                                             label=layer_name),
+                             input_layer.shape)
+            print('Creating projection')
+            sim.Projection(input_layer.population, new_layer.population,
+                           sim.OneToOneConnector(),
+                           sim.StaticSynapse(weight=5))
+            current_layers.append(new_layer)
+        S1_layers[size] = current_layers
+    return S1_layers
 
 def create_cross_layer_inhibition(layers_dict):
     """
