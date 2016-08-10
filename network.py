@@ -117,11 +117,11 @@ def recognizer_weights_from(feature_np_array):
     sim.run(500)
     return proj.get('weight', 'array')
 
-def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
+def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
                    k_out):
     """
-    Connects a small recognizer output layer to a big spike source generator
-    layer.
+    Connects a neuron of an output layer to the corresponding square of an input
+    layer. This is a helper function of connect_layer_to_layer()
     """
     m = input_layer.shape[1]
     view_elements = []
@@ -134,62 +134,125 @@ def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
         i += 1
 
     sim.Projection(input_layer.population[view_elements],
-                   output_population[[k_out]],
+                   output_layer.population[[k_out]],
                    sim.AllToAllConnector(),
                    sim.StaticSynapse(weight=weights))
 
-def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
+def how_many_squares_in_shape(input_shape, feature_shape, delta):
     """
-    Builds a layer which connects to the input_layer according to the given
-    parameters.
+    Computes the shape of an output layer that can be plugged into the input
+    layer with respect to their shapes and the delta
+
+    Parameters;
+        `input_shape`: The shape of the input layer
+
+        `output_shape`: The shape of the output layer
+
+        `delta`: The vertical and horizontal offset of the output layers squares
+
+    Returns:
+        A pair representing the shape of an output layer that can be plugged
+        into the input layer with respect to their shapes and the delta
     """
-    weights = weights_tuple[0]
-    f_n, f_m = weights_tuple[1]
-    t_n, t_m = input_layer.shape
     # Determine how many output neurons can be connected to the input layer
     # according to the deltas
-    overfull_n = (t_n - f_n) % delta > 0 # True for vertical overflow
-    overfull_m = (t_m - f_m) % delta > 0 # True for horizontal overflow
+    t_n, t_m = input_shape
+    f_n, f_m = feature_shape
     n = int((t_n - f_n) / delta) + ((t_n - f_n) % delta > 0) + 1
     m = int((t_m - f_m) / delta) + ((t_m - f_m) % delta > 0) + 1
-    total_output_neurons = n * m
-#    print('Number of output neurons {} for size {}x{}'.format(\
-#                                            total_output_neurons, t_n, t_m))
-    print('Layer:', layer_name)
-    output_population = sim.Population(total_output_neurons,
-                                       sim.IF_curr_exp(tau_refrac=refrac),
-                                       structure=space.Grid2D(aspect_ratio=m/n),
-                                       label=layer_name)
+    return (n, m)
 
+def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
+                           weights):
+    """
+    Connects a full input layer to a full output layer by connecting each
+    neuron of the output layer to a square of neurons in the input layer
+    according to the shape of the square and the delta.
+
+    Parameters:
+        `input_layer`: The input layer
+
+        `output_layer`: The output layer
+
+        `feature_shape`: The shape of the squares of the input which will be
+                         connected to one output neuron
+
+        `delta`: The vertical and horizontal offset of the output layers squares
+
+        `weights`: A list of weights in the shape returned by
+                   Projection.get('weight') 
+    """
     # Go through the lines of the image and connect input neurons to the
     # output layer according to delta
+    t_n, t_m = input_layer.shape
+    f_n, f_m = feature_shape
+    overfull_n = (t_n - f_n) % delta > 0 # True for vertical overflow
+    overfull_m = (t_m - f_m) % delta > 0 # True for horizontal overflow
     k_out = 0
     i = 0
     while i + f_n <= t_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_population, weights,
+            connect_layers(input_layer, output_layer, weights,
                            i, j, i + f_n, j + f_m, k_out)
             k_out += 1
             j += delta
         if overfull_m:
-            connect_layers(input_layer, output_population, weights,
+            connect_layers(input_layer, output_layer, weights,
                            i, t_m - f_m, i + f_n, t_m, k_out)
             k_out += 1
         i += delta
     if overfull_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_population, weights,
+            connect_layers(input_layer, output_layer, weights,
                            t_n - f_n, j, t_n, j + f_m, k_out)
             k_out += 1
             j += delta
         if overfull_m:
-            connect_layers(input_layer, output_population, weights,
+            connect_layers(input_layer, output_layer, weights,
                            t_n - f_n, t_m - f_m, t_n, t_m, k_out)
             k_out += 1
-    return Layer(output_population, (n, m))
+    
 
+def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
+    """
+    Builds a layer which connects to the input_layer according to the given
+    parameters.
+
+    Parameters:
+        `input_layer`: The input layer
+
+        `weights_tuple`: A tuple of the form (weights, weights_shape)
+
+        `delta`: The vertical and horizontal offset of the output layers squares
+        
+        `layer_name`: The name of the input layer
+
+        `refrac`: The refractory period of the output layer neurons
+
+    Returns:
+        An output layer which is connected to the given input layer according
+        to the given parameters
+    """
+#    print('Number of output neurons {} for size {}x{}'.format(\
+#                                            total_output_neurons, t_n, t_m))
+    n, m = how_many_squares_in_shape(input_layer.shape, weights_tuple[1], delta)
+    total_output_neurons = n * m
+    print('Layer:', layer_name)
+    output_layer = Layer(sim.Population(total_output_neurons,
+                                       sim.IF_curr_exp(tau_refrac=refrac),
+                                       structure=space.Grid2D(aspect_ratio=m/n),
+                                       label=layer_name), (n, m))
+
+    connect_layer_to_layer(input_layer, output_layer, weights_tuple[1], delta,
+                           weights_tuple[0])
+
+    return output_layer
+
+# TODO: integrate this function into create_S1_layers(), since it's too small
+#       and it's used only by create_S1_layers(). this also leads to a better
+#       overview of the module and increases understandability.
 def create_all_feature_layers_for(input_layer, weights_dict, args):
     """
     Takes an input spike source layer and a dict of weight arrays and creates an
