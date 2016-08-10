@@ -250,37 +250,6 @@ def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
 
     return output_layer
 
-# TODO: integrate this function into create_S1_layers(), since it's too small
-#       and it's used only by create_S1_layers(). this also leads to a better
-#       overview of the module and increases understandability.
-def create_all_feature_layers_for(input_layer, weights_dict, args):
-    """
-    Takes an input spike source layer and a dict of weight arrays and creates an
-    output layer for each separate feature. Uses the commandline arguments to
-    determine the horizontal and vertical deltas as well as the neuron
-    refractory period.
-
-    Arguments:
-
-        `input_layer`: The spike source input layer
-
-        `weights_dict`: A dictionary containing for each feature name a pair
-                        of a weight list and its shape
-
-        `args`: The commandline arguments object. It uses the deltas and the
-                neuron refractory period from it
-
-    Returns:
-
-        A list of S1 layers.
-    """
-    feature_layers = [] # list of layers
-    for layer_name, weights_tuple in weights_dict.items():
-        feature_layers.append(create_output_layer(input_layer, weights_tuple,
-                                                     args.delta, layer_name,
-                                                     args.refrac_s1))
-    return feature_layers
-
 def create_corner_layer_for(input_layers):
     shape = input_layers[0].shape
     total_output_neurons = np.prod(shape)
@@ -486,16 +455,16 @@ def create_S1_layers(input_layers_dict, weights_dict, args):
     S1_layers = {} # input size -> list of S1 feature layers
     for size, input_layer in input_layers_dict.items():
         print('Create S1 layers for size', size)
-        neuron_count = 0
         t1 = time.clock()
-        current_invariance_layers = create_all_feature_layers_for(input_layer,
-                                                             weights_dict, args)
+        S1_layers[size] = [create_output_layer(input_layer, weights_tuple,
+                                               args.delta, layer_name,
+                                               args.refrac_s1)\
+                          for layer_name, weights_tuple in weights_dict.items()]
         print('S1 layer creation for scale {} took {} s'.format(size,
                                                             time.clock() - t1))
-        S1_layers[size] = current_invariance_layers
 
-        for layer in current_invariance_layers:
-            neuron_count += layer.shape[0] * layer.shape[1]
+        neuron_count = sum(map(lambda layer: layer.shape[0] * layer.shape[1],
+                               S1_layers[size]))
         print('S1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return S1_layers
 
@@ -533,7 +502,6 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
     """
     C1_layers = {} # input size -> list of C1 layers
     for size, S1_layers in S1_layers_dict.items():
-        neuron_count = 0
         C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
@@ -542,12 +510,13 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
                          C1_subsampling_shape)
         t1 = time.clock()
-        for S1_layer in S1_layers:
-            C1_output_layer = create_output_layer(S1_layer, weights_tuple,
-                                   move, S1_layer.population.label, refrac_c1)
-            C1_layers[size].append(C1_output_layer)
-            neuron_count += C1_output_layer.shape[0] * C1_output_layer.shape[1]
+        C1_layers[size] = list(map(lambda S1_layer:\
+                                    create_output_layer(S1_layer, weights_tuple,
+                                    move, S1_layer.population.label, refrac_c1),
+                                   S1_layers))
         print('C1 layer creation for scale {} took {} s'.format(size,
                                                             time.clock() - t1))
+        neuron_count = sum(map(lambda layer: layer.shape[0] * layer.shape[1],
+                               C1_layers[size]))
         print('C1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return C1_layers
