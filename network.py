@@ -42,17 +42,28 @@ class Layer:
                 spike_counts[self.population[i]] - self.old_spike_counts[i]
             self.old_spike_counts[i] = spike_counts[self.population[i]]
 
+def set_i_offsets(layer, source_np_array):
+    """
+    Sets the i_offset for the input neuons according to the pixel values of the
+    input image.
+
+    Parameters:
+        `layer`: The layer for which to set the i_offsets
+
+        `source_np_array`: The array with the pixel intensities from which to
+                           set the i_offsets
+    """
+    layer.population.set(i_offset=list(map(lambda x: x / 255 * .6 + .75,
+                                           source_np_array.ravel())))
+
 def set_spike_source_layer_rates(layer, source_np_array):
     """
     Sets the firing rates of the already created spike source layer to the
     given source_np_array. This is also a helper function of
     create_spike_source_layer_from().
     """
-    reshaped_array = source_np_array.ravel()
-    rates = []
-    for rate in reshaped_array:
-        rates.append(int(rate / 4))
-    layer.population.set(rate=rates)
+    layer.population.set(rate=list(map(lambda x: x / 4,
+                                       source_np_array.ravel())))
 
 def create_empty_spike_source_layer_with_shape(shape):
     """
@@ -305,7 +316,7 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
 def create_gabor_input_layers_for_scales(target, scales):
     """
     Creates input layers from the given image by using gabor filters in four
-    orientations
+    orientations.
 
     Parameters:
         `target`: The target image from which to compute the gabor filters and
@@ -324,8 +335,10 @@ def create_gabor_input_layers_for_scales(target, scales):
                                     interpolation=cv2.INTER_AREA)
         current_feature_layers = []
         for name, edge_img in cm.get_gabor_edges(resized_target).items():
-            layer = create_spike_source_layer_from(edge_img)
-            layer.population.label=name
+            n, m = resized_target.shape
+            layer = Layer(sim.Population(n * m, sim.IF_curr_exp()), (n, m))
+            layer.population.label = name
+            set_i_offsets(layer, edge_img)
             current_feature_layers.append(layer)
         input_layers[size] = current_feature_layers
     return input_layers
@@ -333,7 +346,7 @@ def create_gabor_input_layers_for_scales(target, scales):
 def create_gabor_S1_layers(input_layers_dict):
     """
     Create for each input layer a S1 layer which has a one-to-one connection to
-    it
+    it.
 
     Parameters:
         `input_layers_dict`: A dictionary containing for each size a list of
