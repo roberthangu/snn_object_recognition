@@ -72,4 +72,10 @@ vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
                             args)
 print('C1 visualization took {} s'.format(time.clock() - t1))
 
+t1 = time.clock()
+if args.plot_spikes:
+    print('Plotting spikes')
+    vis.plot_spikes(layer_collection, args)
+    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
+
 sim.end()
