@@ -14,11 +14,12 @@ def parse_args():
     """
     dflt_move=4
     parser = ap.ArgumentParser(description='SNN feature detector')
-    parser.add_argument('--delta-i', metavar='vert', default=dflt_move, type=int,
-                        help='The vertical distance between the basic recognizers')
-    parser.add_argument('--delta-j', metavar='horiz', default=dflt_move, type=int,
-                        help='The horizontal distance between the basic feature\
-                        recognizers')
+    parser.add_argument('--c1-output', type=str, default='C1_reconstructions/',
+                        help='The toplevel output directory for C1\
+                        reconstructions')
+    parser.add_argument('--delta', metavar='vert', default=dflt_move, type=int,
+                        help='The horizontal and vertical distance between the\
+                        basic recognizers')
     parser.add_argument('--feature-dir', type=str,
                         help='A directory where the features are stored as images')
     parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],

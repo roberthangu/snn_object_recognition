@@ -127,8 +127,7 @@ def connect_layers(input_layer, output_population, weights, i_s, j_s, i_e, j_e,
                    sim.AllToAllConnector(),
                    sim.StaticSynapse(weight=weights))
 
-def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
-                        layer_name, refrac):
+def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
     """
     Builds a layer which connects to the input_layer according to the given
     parameters.
@@ -138,10 +137,10 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
     t_n, t_m = input_layer.shape
     # Determine how many output neurons can be connected to the input layer
     # according to the deltas
-    overfull_n = (t_n - f_n) % delta_i > 0 # True for vertical overflow
-    overfull_m = (t_m - f_m) % delta_j > 0 # True for horizontal overflow
-    n = int((t_n - f_n) / delta_i) + ((t_n - f_n) % delta_i > 0) + 1
-    m = int((t_m - f_m) / delta_j) + ((t_m - f_m) % delta_j > 0) + 1
+    overfull_n = (t_n - f_n) % delta > 0 # True for vertical overflow
+    overfull_m = (t_m - f_m) % delta > 0 # True for horizontal overflow
+    n = int((t_n - f_n) / delta) + ((t_n - f_n) % delta > 0) + 1
+    m = int((t_m - f_m) / delta) + ((t_m - f_m) % delta > 0) + 1
     total_output_neurons = n * m
 #    print('Number of output neurons {} for size {}x{}'.format(\
 #                                            total_output_neurons, t_n, t_m))
@@ -152,7 +151,7 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
                                        label=layer_name)
 
     # Go through the lines of the image and connect input neurons to the
-    # output layer according to delta_i and delta_j.
+    # output layer according to delta
     k_out = 0
     i = 0
     while i + f_n <= t_n:
@@ -161,19 +160,19 @@ def create_output_layer(input_layer, weights_tuple, delta_i, delta_j,
             connect_layers(input_layer, output_population, weights,
                            i, j, i + f_n, j + f_m, k_out)
             k_out += 1
-            j += delta_j
+            j += delta
         if overfull_m:
             connect_layers(input_layer, output_population, weights,
                            i, t_m - f_m, i + f_n, t_m, k_out)
             k_out += 1
-        i += delta_i
+        i += delta
     if overfull_n:
         j = 0
         while j + f_m <= t_m:
             connect_layers(input_layer, output_population, weights,
                            t_n - f_n, j, t_n, j + f_m, k_out)
             k_out += 1
-            j += delta_j
+            j += delta
         if overfull_m:
             connect_layers(input_layer, output_population, weights,
                            t_n - f_n, t_m - f_m, t_n, t_m, k_out)
@@ -204,8 +203,8 @@ def create_all_feature_layers_for(input_layer, weights_dict, args):
     feature_layers = [] # list of layers
     for layer_name, weights_tuple in weights_dict.items():
         feature_layers.append(create_output_layer(input_layer, weights_tuple,
-                                                     args.delta_i, args.delta_j,
-                                                     layer_name, args.refrac_s1))
+                                                     args.delta, layer_name,
+                                                     args.refrac_s1))
     return feature_layers
 
 def create_corner_layer_for(input_layers):
@@ -462,15 +461,14 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
         C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
-        move_i, move_j = (6, 6)
+        move = 6
         C1_weight = 5
         weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
                          C1_subsampling_shape)
         t1 = time.clock()
         for S1_layer in S1_layers:
             C1_output_layer = create_output_layer(S1_layer, weights_tuple,
-                                   move_i, move_j, S1_layer.population.label,
-                                   refrac_c1)
+                                   move, S1_layer.population.label, refrac_c1)
             C1_layers[size].append(C1_output_layer)
             neuron_count += C1_output_layer.shape[0] * C1_output_layer.shape[1]
         print('C1 layer creation for scale {} took {} s'.format(size,

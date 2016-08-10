@@ -4,7 +4,7 @@ import pyNN.utility.plotting as plt
 import cv2
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
-                          layer_shape, delta_i, delta_j):
+                          layer_shape, delta):
     """
     Copies a feature image onto the visualization canvas at the given position
     of the neuron layer with the given intensity.
@@ -20,9 +20,7 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
 
         `layer_shape`: The shape of the neuron layer which detects the features
 
-        `delta_i`: The horizontal offset between the feature layers
-
-        `delta_j`: The vertical offset between the feature layers
+        `delta`: The horizontal and vertical offset between the feature layers
     """
     n, m = layer_shape
     f_n = feature_img.shape[0]
@@ -31,8 +29,8 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
     t_m = visualization_img.shape[1]
     p_i = int(pos / m)
     p_j = pos % m
-    start_i = delta_i * p_i
-    start_j = delta_j * p_j
+    start_i = delta * p_i
+    start_j = delta * p_j
     if p_i == n - 1:
         start_i = t_n - f_n
     if p_j == m - 1:
@@ -53,7 +51,7 @@ def plot_weights(weights_dict):
     pynnplt.Figure(*weight_panels).save('plots/weights_plot_blurred.png')
 
 def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
-                        delta_i, delta_j, canvas=None):
+                        delta, canvas=None):
     """
     Reconstructs the initial image by drawing the features on the recognized
     positions with an intensity proportional to the respective neuron firing rate.
@@ -67,9 +65,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
-        `delta_i`: The horizontal offset between the feature layers
-
-        `delta_j`: The vertical offset between the feature layers
+        `delta`: The horizontal and vertical offset between the feature layers
 
     Returns:
         A dictionary which contains for each size a list of pairs of the
@@ -108,7 +104,7 @@ def visualization_parts(target_img_shape, layers_dict, feature_imgs_dict,
                 # each spiketrain corresponds to a layer S1 output neuron
                 copy_to_visualization(i, spike_counts[i] / max_firing,
                                       feature_img, scaled_vis_img, layer.shape,
-                                      delta_i, delta_j)
+                                      delta)
             upscaled_vis_img = cv2.resize(src=scaled_vis_img, dsize=(t_m, t_n),
                                           interpolation=cv2.INTER_CUBIC)
             partial_reconstructions_dict[size].append(\
@@ -132,10 +128,8 @@ def create_S1_feature_image(target_img, layer_collection, feature_imgs_dict,
     """
     print('Reconstructing S1 features')
     vis_img = np.zeros(target_img.shape)
-    vis_parts = visualization_parts(target_img.shape,
-                                    layer_collection['S1'],
-                                    feature_imgs_dict,
-                                    args.delta_i, args.delta_j)
+    vis_parts = visualization_parts(target_img.shape, layer_collection['S1'],
+                                    feature_imgs_dict, args.delta)
     for img_pairs in vis_parts.values():
         for img, feature_label in img_pairs:
             vis_img += img
@@ -161,7 +155,7 @@ def reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
-        `args`: The commandline arguments object. Uses the deltas and the target
+        `args`: The commandline arguments object. Uses the delta and the target
                 image name from it
         
     """
@@ -186,7 +180,7 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
         `feature_imgs_dict`: A dictionary containing for each name the
                              corresponding feature image
 
-        `args`: The commandline arguments object. Uses the deltas and the target
+        `args`: The commandline arguments object. Uses the delta and the target
                 image name from it
 
     """
@@ -205,8 +199,8 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
     for feature_name, feature_img in feature_imgs_dict.items():
         color_name = color_iterator.__next__()
         f_n, f_m = feature_img.shape
-        bf_n = 6 * args.delta_i + f_m   # "big" f_n
-        bf_m = 6 * args.delta_j + f_m   # "big" f_m
+        bf_n = 6 * args.delta + f_m   # "big" f_n
+        bf_m = 6 * args.delta + f_m   # "big" f_m
         # Create a square to cover all pixels of a C1 neuron
         square = np.zeros((bf_n, bf_m, 3))
         cv2.rectangle(square, (0, 0), (bf_n - 1, bf_m - 1), colors[color_name])
@@ -214,10 +208,9 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
         colored_squares_dict[feature_name] = square
     vis_parts = visualization_parts(target_img.shape, layer_collection['C1'],
                                     colored_squares_dict,
-                                    6 * args.delta_i,
-                                    6 * args.delta_j, canvas)
+                                    6 * args.delta, canvas)
     img_name_stem = plb.Path(args.target_name).stem
-    output_dir = plb.Path('C1_reconstructions/' + img_name_stem)
+    output_dir = plb.Path(args.c1_output + '/' + img_name_stem)
     if not output_dir.exists():
         output_dir.mkdir()
     for size, img_pairs in vis_parts.items():
