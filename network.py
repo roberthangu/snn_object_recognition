@@ -1,6 +1,9 @@
+from typing import Dict, Sequence, List
 import numpy as np
 import pyNN.nest as sim
 import pyNN.space as space
+import pyNN.random as rnd
+import argparse as ap
 import cv2
 import pathlib as plb
 import time
@@ -20,8 +23,8 @@ class Layer:
 
         `shape`:      The shape of the layer as a tuple of (rows, cols)
 
-        `current_spike_counts`: The spike counts which are generated from one
-                                simulation run to the next
+        `projections`: A dictionary containing for each feature name a list of
+                       projections of this layer for that feature
     """
 
     def __init__(self, population, shape):
@@ -29,6 +32,7 @@ class Layer:
         self.shape = shape
         self.current_spike_counts = [0] * population.size
         self.old_spike_counts = [0] * population.size
+        self.projections = {} # Dict[str, Sequence[sim.Projection]]
 
     def update_spike_counts(self):
         """
@@ -118,10 +122,13 @@ def recognizer_weights_from(feature_np_array):
     return proj.get('weight', 'array')
 
 def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
-                   k_out):
+                   k_out, stdp=False):
     """
     Connects a neuron of an output layer to the corresponding square of an input
     layer. This is a helper function of connect_layer_to_layer()
+
+    Returns:
+        The created projection between the input and output layers
     """
     m = input_layer.shape[1]
     view_elements = []
@@ -133,10 +140,22 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
             j += 1
         i += 1
 
-    sim.Projection(input_layer.population[view_elements],
-                   output_layer.population[[k_out]],
-                   sim.AllToAllConnector(),
-                   sim.StaticSynapse(weight=weights))
+    if stdp:
+        td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
+                               A_plus=0.01, A_minus=0.012)
+        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.5)
+        proj = sim.Projection(input_layer.population[view_elements],
+                              output_layer.population[[k_out]],
+                              sim.AllToAllConnector(),
+                              sim.STDPMechanism(timing_dependence=td,
+                                                weight_dependence=wd,
+                                                weight=weights))
+    else:
+        proj = sim.Projection(input_layer.population[view_elements],
+                              output_layer.population[[k_out]],
+                              sim.AllToAllConnector(),
+                              sim.StaticSynapse(weight=weights))
+    return proj
 
 def how_many_squares_in_shape(input_shape, feature_shape, delta):
     """
@@ -146,7 +165,7 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     Parameters;
         `input_shape`: The shape of the input layer
 
-        `output_shape`: The shape of the output layer
+        `feature_shape`: The shape of the feature
 
         `delta`: The vertical and horizontal offset of the output layers squares
 
@@ -158,12 +177,15 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     # according to the deltas
     t_n, t_m = input_shape
     f_n, f_m = feature_shape
+    if t_n < f_n or t_m < f_m:
+        raise Exception('Feature shape {} is greater than layer shape {}'.format(\
+                                                   feature_shape, input_shape))
     n = int((t_n - f_n) / delta) + ((t_n - f_n) % delta > 0) + 1
     m = int((t_m - f_m) / delta) + ((t_m - f_m) % delta > 0) + 1
     return (n, m)
 
 def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
-                           weights):
+                           weights, stdp=False) -> List[sim.Projection]:
     """
     Connects a full input layer to a full output layer by connecting each
     neuron of the output layer to a square of neurons in the input layer
@@ -181,6 +203,9 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
 
         `weights`: A list of weights in the shape returned by
                    Projection.get('weight') 
+
+    Returns:
+        A list of the projections of the input layer to the output layer.
     """
     # Go through the lines of the image and connect input neurons to the
     # output layer according to delta
@@ -189,30 +214,36 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
     overfull_n = (t_n - f_n) % delta > 0 # True for vertical overflow
     overfull_m = (t_m - f_m) % delta > 0 # True for horizontal overflow
     k_out = 0
+    projections = []
     i = 0
     while i + f_n <= t_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_layer, weights,
-                           i, j, i + f_n, j + f_m, k_out)
+            projections.append(connect_layers(input_layer, output_layer,
+                                              weights, i, j, i + f_n, j + f_m,
+                                              k_out, stdp))
             k_out += 1
             j += delta
         if overfull_m:
-            connect_layers(input_layer, output_layer, weights,
-                           i, t_m - f_m, i + f_n, t_m, k_out)
+            projections.append(connect_layers(input_layer, output_layer,
+                                              weights, i, t_m - f_m, i + f_n,
+                                              t_m, k_out, stdp))
             k_out += 1
         i += delta
     if overfull_n:
         j = 0
         while j + f_m <= t_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_n - f_n, j, t_n, j + f_m, k_out)
+            projections.append(connect_layers(input_layer, output_layer,
+                                              weights, t_n - f_n, j, t_n,
+                                              j + f_m, k_out, stdp))
             k_out += 1
             j += delta
         if overfull_m:
-            connect_layers(input_layer, output_layer, weights,
-                           t_n - f_n, t_m - f_m, t_n, t_m, k_out)
+            projections.append(connect_layers(input_layer, output_layer,
+                                              weights, t_n - f_n, t_m - f_m,
+                                              t_n, t_m, k_out, stdp))
             k_out += 1
+    return projections
     
 
 def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
@@ -405,32 +436,6 @@ def create_gabor_S1_layers(input_layers_dict):
         S1_layers[size] = current_layers
     return S1_layers
 
-def create_cross_layer_inhibition(layers_dict):
-    """
-    Creates inhibitory connections between the given feature layers for each
-    size to allow only the spikes of the strongest feature to be propagated
-    further
-
-    Parameters:
-        
-        `layers_dict`: A dictionary of layers of the type size -> list of layers
-    """
-    def inhibitory_connect(layers, source, dest1, dest2, dest3, weight):
-        sim.Projection(layers[source].population, layers[dest1].population,
-                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
-        sim.Projection(layers[source].population, layers[dest2].population,
-                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
-        sim.Projection(layers[source].population, layers[dest3].population,
-                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
-
-    print('Create inhibitory connections')
-    for size, layers in layers_dict.items():
-        print('Create cross layer inhibiton for size', size)
-        inhibitory_connect(layers, 0, 1, 2, 3, -50)
-        inhibitory_connect(layers, 1, 0, 2, 3, -50)
-        inhibitory_connect(layers, 2, 0, 1, 3, -50)
-        inhibitory_connect(layers, 3, 0, 1, 2, -50)
-
 def create_S1_layers(input_layers_dict, weights_dict, args):
     """
     Creates S1 layers for the given input layers. It creates for each input
@@ -468,22 +473,31 @@ def create_S1_layers(input_layers_dict, weights_dict, args):
         print('S1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return S1_layers
 
-def create_local_inhibition(layers_dict):
+def create_cross_layer_inhibition(layers_dict):
     """
-    Creates local inhibitory connections from a neuron to its neighbors in an
-    area of a fixed distance. The latency of its neighboring neurons decreases
-    linearly with the distance from the spike from 15% to 5%, as described in
-    Masquelier's paper. Here we assumed that a weight of -10 inhibits the
-    neuron completely and took that as a starting point.
+    Creates inhibitory connections between the given feature layers for each
+    size to allow only the spikes of the strongest feature to be propagated
+    further
+
+    Parameters:
+        
+        `layers_dict`: A dictionary of layers of the type size -> list of layers
     """
+    def inhibitory_connect(layers, source, dest1, dest2, dest3, weight):
+        sim.Projection(layers[source].population, layers[dest1].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+        sim.Projection(layers[source].population, layers[dest2].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+        sim.Projection(layers[source].population, layers[dest3].population,
+                       sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
+
+    print('Create inhibitory connections')
     for size, layers in layers_dict.items():
-        print('Create local inhibition for size', size)
-        for layer in layers:
-            sim.Projection(layer.population, layer.population,
-                sim.DistanceDependentProbabilityConnector('d < 5',
-                    allow_self_connections=False),
-                sim.StaticSynapse(weight='.25 * d - 1.75'),
-                space=space.Space(axes='xy')) 
+        print('Create cross layer inhibiton for size', size)
+        inhibitory_connect(layers, 0, 1, 2, 3, -50)
+        inhibitory_connect(layers, 1, 0, 2, 3, -50)
+        inhibitory_connect(layers, 2, 0, 1, 3, -50)
+        inhibitory_connect(layers, 3, 0, 1, 2, -50)
 
 def create_C1_layers(S1_layers_dict, refrac_c1):
     """
@@ -520,3 +534,57 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
                                C1_layers[size]))
         print('C1 layers at scale {} have {} neurons'.format(size, neuron_count))
     return C1_layers
+
+def create_local_inhibition(layers_dict):
+    """
+    Creates local inhibitory connections from a neuron to its neighbors in an
+    area of a fixed distance. The latency of its neighboring neurons decreases
+    linearly with the distance from the spike from 15% to 5%, as described in
+    Masquelier's paper. Here we assumed that a weight of -10 inhibits the
+    neuron completely and took that as a starting point.
+    """
+    for size, layers in layers_dict.items():
+        print('Create local inhibition for size', size)
+        for layer in layers:
+            sim.Projection(layer.population, layer.population,
+                sim.DistanceDependentProbabilityConnector('d < 5',
+                    allow_self_connections=False),
+                sim.StaticSynapse(weight='.25 * d - 1.75'),
+                space=space.Space(axes='xy')) 
+
+def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace)\
+        -> Dict[float, Layer]:
+    """
+    Creates the S2 layers for all sizes
+
+    Parameters:
+        `layers_dict`: A dictionary containing for each size a list of C1
+                       layers, for each feature one
+
+        `args`: The command-line arguments object
+
+    Returns:
+        A dictionary containing for each size the S2 layer
+    """
+    f_s = 16
+    rng = rnd.RandomDistribution('normal', mu=.1, sigma=.01)
+    weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
+    S2_layers = {}
+    for size, layers in C1_layers.items():
+        n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
+        S2_layer = Layer(sim.Population(n * m,
+                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2),
+                                     structure=space.Grid2D(aspect_ratio=m/n),
+                                     label=size), (n, m))
+        for layer in layers:
+            S2_layer.projections[layer.population.label] =\
+                connect_layer_to_layer(layer, S2_layer, (f_s, f_s), f_s,
+                                       weights, stdp=True)
+        S2_layers[size] = S2_layer
+    return S2_layers
+
+def create_S2_inhibition(S2_layers: Dict[float, Layer]) -> None:
+    """
+    Creates the inhibitory connections between the S2 cells
+    """
+    pass

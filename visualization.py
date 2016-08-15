@@ -232,13 +232,13 @@ def plot_spikes(layer_collection, args):
         `args`: The commandline arguments object. Uses the target image name
                 from it
     """
-    for layer_name in ['S1', 'C1']:
+    for layer_name in ['C1']:
         if layer_name in layer_collection:
             for size, layers in layer_collection[layer_name].items():
                 spike_panels = []
                 for layer in layers:
                     out_data = layer.population.get_data().segments[0]
-                    spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
+                    spike_panels.append(plt.Panel(out_data.spiketrains,
                                                   xticks=True, yticks=True,
                                                   xlabel='{}, {} scale layer'.format(\
                                                             layer.population.label, size)))
@@ -246,3 +246,15 @@ def plot_spikes(layer_collection, args):
                                                         layer_name,
                                                         plb.Path(args.target_name).stem,
                                                         size))
+    if 'S2' in layer_collection:
+        spike_panels = []
+        for size, layer in layer_collection['S2'].items():
+            out_data = layer.population.get_data().segments[0]
+            spike_panels.append(plt.Panel(out_data.spiketrains,
+                                          xticks=True, yticks=True,
+                                          xlabel='{} scale layer'.format(size)))
+#            spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
+#                                          xticks=True, yticks=True,
+#                                          xlabel='{} scale layer'.format(size)))
+        plt.Figure(*spike_panels).save('plots/S2_{}.png'.format(\
+                                               plb.Path(args.target_name).stem))

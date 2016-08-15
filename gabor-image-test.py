@@ -40,11 +40,19 @@ layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
 nw.create_local_inhibition(layer_collection['C1'])
 print('C1 creation took {} s'.format(time.clock() - t1))
 
-for layer_name in ['S1', 'C1']:
+print('Creating S2 layers')
+t1 = time.clock()
+layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], args)
+print('S2 creation took {} s'.format(time.clock() - t1))
+#create_S2_inhibition(layer_collection['S2'])
+
+for layer_name in ['C1']:
     if layer_name in layer_collection:
         for layers in layer_collection[layer_name].values():
             for layer in layers:
                 layer.population.record('spikes')
+for layer in layer_collection['S2'].values():
+    layer.population.record(['spikes', 'v'])
 
 print('========= Start simulation =========')
 start_time = time.clock()
@@ -53,19 +61,21 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
-for layer_name in ['S1', 'C1']:
+for layer_name in ['C1']:
     if layer_name in layer_collection:
         for layers in layer_collection[layer_name].values():
             for layer in layers:
                 layer.update_spike_counts()
+for layer in layer_collection['S2'].values():
+    layer.update_spike_counts()
 
-feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
-feature_imgs_dict = dict([(name, np.zeros((1,1))) for name in feature_names])
-
-t1 = time.clock()
-vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
-                            args)
-print('C1 visualization took {} s'.format(time.clock() - t1))
+#feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
+#feature_imgs_dict = dict([(name, np.zeros((1,1))) for name in feature_names])
+#
+#t1 = time.clock()
+#vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
+#                            args)
+#print('C1 visualization took {} s'.format(time.clock() - t1))
 
 t1 = time.clock()
 if args.plot_spikes:

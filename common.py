@@ -35,6 +35,8 @@ def parse_args():
                         help='Plots the learned feature weights and exits')
     parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
                         help='The refractory period of neurons in the S1 layer in ms')
+    parser.add_argument('--refrac-s2', type=float, default=.1, metavar='MS',
+                        help='The refractory period of neurons in the S2 layer in ms')
     parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
                         help='The refractory period of neurons in the C1 layer in ms')
     parser.add_argument('--reconstruct-s1-img', action='store_true',
