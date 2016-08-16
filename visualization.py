@@ -253,8 +253,8 @@ def plot_spikes(layer_collection, args):
             spike_panels.append(plt.Panel(out_data.spiketrains,
                                           xticks=True, yticks=True,
                                           xlabel='{} scale layer'.format(size)))
-#            spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
-#                                          xticks=True, yticks=True,
-#                                          xlabel='{} scale layer'.format(size)))
+            spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
+                                          xticks=True, yticks=True,
+                                          xlabel='{} scale layer'.format(size)))
         plt.Figure(*spike_panels).save('plots/S2_{}.png'.format(\
                                                plb.Path(args.target_name).stem))

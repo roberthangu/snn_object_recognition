@@ -271,6 +271,7 @@ def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
     n, m = how_many_squares_in_shape(input_layer.shape, weights_tuple[1], delta)
     total_output_neurons = n * m
     print('Layer:', layer_name)
+    print('Output layer has shape', n, m)
     output_layer = Layer(sim.Population(total_output_neurons,
                                        sim.IF_curr_exp(tau_refrac=refrac),
                                        structure=space.Grid2D(aspect_ratio=m/n),
@@ -491,7 +492,6 @@ def create_cross_layer_inhibition(layers_dict):
         sim.Projection(layers[source].population, layers[dest3].population,
                        sim.OneToOneConnector(), sim.StaticSynapse(weight=weight))
 
-    print('Create inhibitory connections')
     for size, layers in layers_dict.items():
         print('Create cross layer inhibiton for size', size)
         inhibitory_connect(layers, 0, 1, 2, 3, -50)
@@ -499,7 +499,8 @@ def create_cross_layer_inhibition(layers_dict):
         inhibitory_connect(layers, 2, 0, 1, 3, -50)
         inhibitory_connect(layers, 3, 0, 1, 2, -50)
 
-def create_C1_layers(S1_layers_dict, refrac_c1):
+def create_C1_layers(S1_layers_dict: Dict[float, Sequence[Layer]],
+                     refrac_c1: float) -> Dict[float, Sequence[Layer]]:
     """
     Creates C1 layers for each of the given S1 layers
 
@@ -516,7 +517,6 @@ def create_C1_layers(S1_layers_dict, refrac_c1):
     """
     C1_layers = {} # input size -> list of C1 layers
     for size, S1_layers in S1_layers_dict.items():
-        C1_layers[size] = []
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
         move = 6
@@ -567,11 +567,12 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    rng = rnd.RandomDistribution('normal', mu=.1, sigma=.01)
+    rng = rnd.RandomDistribution('normal', mu=.05, sigma=.01)
     weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
+        print('S2 Shape', n, m)
         S2_layer = Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
@@ -581,10 +582,19 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                 connect_layer_to_layer(layer, S2_layer, (f_s, f_s), f_s,
                                        weights, stdp=True)
         S2_layers[size] = S2_layer
+    # Create inhibitory connections between the S2 cells
+    # First between the neurons of the same layer...
+    print('Create S2 self inhibitory connections')
+    for layer in S2_layers.values():
+        sim.Projection(layer.population, layer.population,
+                       sim.AllToAllConnector(allow_self_connections=False),
+                       sim.StaticSynapse(weight=-100))
+    # ...and between the layers
+    print('Create S2 cross-scale inhibitory connections')
+    for layer1 in S2_layers.values():
+        for layer2 in S2_layers.values():
+            if layer1 != layer2:
+                sim.Projection(layer1.population, layer2.population,
+                               sim.AllToAllConnector(),
+                               sim.StaticSynapse(weight=-100))
     return S2_layers
-
-def create_S2_inhibition(S2_layers: Dict[float, Layer]) -> None:
-    """
-    Creates the inhibitory connections between the S2 cells
-    """
-    pass
