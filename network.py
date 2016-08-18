@@ -185,7 +185,7 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     return (n, m)
 
 def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
-                           weights, stdp=False) -> List[sim.Projection]:
+                           weights, stdp=False, delay=None) -> List[sim.Projection]:
     """
     Connects a full input layer to a full output layer by connecting each
     neuron of the output layer to a square of neurons in the input layer
@@ -380,7 +380,8 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
 def create_gabor_input_layers_for_scales(target, scales):
     """
     Creates input layers from the given image by using gabor filters in four
-    orientations.
+    orientations. The firing rate of the neurons is controlled by the i_offsets
+    which are set according to the convolution intensities.
 
     Parameters:
         `target`: The target image from which to compute the gabor filters and
@@ -406,36 +407,6 @@ def create_gabor_input_layers_for_scales(target, scales):
             current_feature_layers.append(layer)
         input_layers[size] = current_feature_layers
     return input_layers
-
-def create_gabor_S1_layers(input_layers_dict):
-    """
-    Create for each input layer a S1 layer which has a one-to-one connection to
-    it.
-
-    Parameters:
-        `input_layers_dict`: A dictionary containing for each size a list of
-                             input layers, for each feature one
-
-    Returns:
-        A dictionary containing for each size a list with the S1 layers
-    """
-    S1_layers = {}
-    for size, layers in input_layers_dict.items():
-        current_layers = []
-        for input_layer in layers:
-            layer_name = input_layer.population.label
-            print('Create S1 layer for size', size, 'feature', layer_name)
-            new_layer = Layer(sim.Population(input_layer.population.size, 
-                                             sim.IF_curr_exp(),
-                                             label=layer_name),
-                             input_layer.shape)
-            print('Creating projection')
-            sim.Projection(input_layer.population, new_layer.population,
-                           sim.OneToOneConnector(),
-                           sim.StaticSynapse(weight=5))
-            current_layers.append(new_layer)
-        S1_layers[size] = current_layers
-    return S1_layers
 
 def create_S1_layers(input_layers_dict, weights_dict, args):
     """
@@ -568,13 +539,16 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     """
     f_s = 16
     rng = rnd.RandomDistribution('normal', mu=.05, sigma=.01)
+    rng2 = rnd.RandomDistribution('normal', mu=.5, sigma=.3)
     weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
+        i_offsets = list(map(lambda x: rng2.next(), range(n * m)))
         print('S2 Shape', n, m)
         S2_layer = Layer(sim.Population(n * m,
-                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2),
+                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2,
+                                                     i_offset=i_offsets),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=size), (n, m))
         for layer in layers:
@@ -588,7 +562,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     for layer in S2_layers.values():
         sim.Projection(layer.population, layer.population,
                        sim.AllToAllConnector(allow_self_connections=False),
-                       sim.StaticSynapse(weight=-100))
+                       sim.StaticSynapse(weight=-5))
     # ...and between the layers
     print('Create S2 cross-scale inhibitory connections')
     for layer1 in S2_layers.values():
@@ -596,5 +570,5 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
             if layer1 != layer2:
                 sim.Projection(layer1.population, layer2.population,
                                sim.AllToAllConnector(),
-                               sim.StaticSynapse(weight=-100))
+                               sim.StaticSynapse(weight=-5))
     return S2_layers
