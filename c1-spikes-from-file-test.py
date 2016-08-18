@@ -59,21 +59,7 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
-#feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
-#feature_imgs_dict = dict([(name, np.zeros((1,1))) for name in feature_names])
-#
-#t1 = time.clock()
-#vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
-#                            args)
-#print('C1 visualization took {} s'.format(time.clock() - t1))
-
-print('Spiketrains of the S2 layer:')
-for size in args.scales:
-    print('For size', size)
-    S2_spiketrains = layer_collection['S2'][size].population.get_data()\
-        .segments[0].spiketrains
-    for spiketrain in S2_spiketrains:
-        print(spiketrain)
+nw.update_shared_weights(layer_collection['S2'])
 
 t1 = time.clock()
 print('Plotting spikes')

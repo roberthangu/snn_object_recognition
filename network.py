@@ -539,7 +539,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     """
     f_s = 16
     rng = rnd.RandomDistribution('normal', mu=.05, sigma=.01)
-    rng2 = rnd.RandomDistribution('normal', mu=.5, sigma=.3)
+    rng2 = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
@@ -572,3 +572,34 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                                sim.AllToAllConnector(),
                                sim.StaticSynapse(weight=-5))
     return S2_layers
+
+def update_shared_weights(S2_layers: Dict[float, Layer]) -> None:
+    """
+    Updates the weights of the "shared" projections of the S2 neurons.
+
+    Parameters:
+        `S2_layers`: A dictionary containing for each size the corresponding S2
+                     layer
+    """
+    earliest_spike = 50
+    first_neuron = 0
+    active_layer = None
+    # Determine the neuron that fired first and the layer it is in
+    for size, current_layer in S2_layers.items():
+        current_spiketrains = current_layer.population.get_data().segments[0]\
+                                                                 .spiketrains
+        for i in range(len(current_spiketrains)):
+            if len(current_spiketrains[i]) > 0\
+                    and current_spiketrains[i][0] < earliest_spike:
+                earliest_spike = current_spiketrains[i][0]
+                first_neuron = i
+                active_layer = current_layer
+#    for label, projections in active_layer.projections.items():
+#        print(projections[first_neuron].get('weight', 'array'))
+
+    # Copy the weights of the neuron in the active layer to all other S2 layers
+    for current_layer in S2_layers.values():
+        for label, projections in current_layer.projections.items():
+            for proj in projections:
+                proj.set(weight=active_layer.projections[label][first_neuron]\
+                                                            .get('weight', 'array'))
