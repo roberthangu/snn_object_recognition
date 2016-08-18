@@ -20,6 +20,8 @@ def parse_args():
     parser.add_argument('--delta', metavar='vert', default=dflt_move, type=int,
                         help='The horizontal and vertical distance between the\
                         basic recognizers')
+    parser.add_argument('--c1-dumpfile', type=str,
+                        help='The file containing the spiketrains of C1')
     parser.add_argument('--feature-dir', type=str,
                         help='A directory where the features are stored as images')
     parser.add_argument('--filter', choices=['canny', 'sobel', 'none'],
@@ -50,7 +52,7 @@ def parse_args():
                         help='A list of image scales for which to create\
                         layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
     parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
-    parser.add_argument('--target-name', type=str, required=True,
+    parser.add_argument('--target-name', type=str,
                         help='The name of the already edge-filtered image to\
                               be recognized')
     args = parser.parse_args()

@@ -5,6 +5,7 @@ import sys
 import pyNN.nest as sim
 import pathlib as plb
 import time
+import pickle
 
 import common as cm
 import network as nw
@@ -13,31 +14,28 @@ import time
 
 args = cm.parse_args()
 
-#gabor_edges = cm.get_gabor_edges(cv2.imread(args.target_name, cv2.CV_8UC1))
-#
-#for edge_name, img in gabor_edges.items():
-#    filename = 'edges/{}_gabor_{}.png'.format(plb.Path(args.target_name).stem,
-#                                              edge_name)
-#    if not plb.Path(filename).exists():
-#        cv2.imwrite(filename, img)
-
 sim.setup(threads=4)
 
 layer_collection = {}
 
 target_img = cv2.imread(args.target_name, cv2.CV_8UC1)
-print('Create S1 layers')
-t1 = time.clock()
-layer_collection['S1'] =\
-    nw.create_gabor_input_layers_for_scales(target_img, args.scales)
-nw.create_cross_layer_inhibition(layer_collection['S1'])
-print('S1 layer creation took {} s'.format(time.clock() - t1))
 
 print('Create C1 layers')
 t1 = time.clock()
-layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
-                                             args.refrac_c1)
-nw.create_local_inhibition(layer_collection['C1'])
+dumpfile = open(args.c1_dumpfile, 'rb')
+ddict = pickle.load(dumpfile)
+layer_collection['C1'] = {}
+for size, layers_as_dicts in ddict.items():
+    layer_list = []
+    for layer_as_dict in layers_as_dicts:
+        n, m = layer_as_dict['shape']
+        spiketrains = layer_as_dict['segment'].spiketrains
+        dimensionless_sts = [[s for s in st] for st in spiketrains]
+        new_layer = nw.Layer(sim.Population(n * m,
+                        sim.SpikeSourceArray(spike_times=dimensionless_sts)), (n, m))
+        new_layer.population.label = layer_as_dict['label']
+        layer_list.append(new_layer)
+    layer_collection['C1'][size] = layer_list
 print('C1 creation took {} s'.format(time.clock() - t1))
 
 print('Creating S2 layers')
@@ -78,9 +76,8 @@ for size in args.scales:
         print(spiketrain)
 
 t1 = time.clock()
-if args.plot_spikes:
-    print('Plotting spikes')
-    vis.plot_spikes(layer_collection, args)
-    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
+print('Plotting spikes')
+vis.plot_spikes(layer_collection, args)
+print('Plotting spiketrains took {} s'.format(time.clock() - t1))
 
 sim.end()
