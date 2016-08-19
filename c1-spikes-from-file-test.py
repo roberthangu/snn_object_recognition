@@ -20,6 +20,12 @@ layer_collection = {}
 
 target_img = cv2.imread(args.target_name, cv2.CV_8UC1)
 
+# Read the gabor features for reconstruction
+feature_imgs_dict = {} # feature string -> image
+for filepath in plb.Path('features_gabor').iterdir():
+    feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
+                                                  cv2.CV_8UC1)
+
 print('Create C1 layers')
 t1 = time.clock()
 dumpfile = open(args.c1_dumpfile, 'rb')
@@ -59,7 +65,11 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
-nw.update_shared_weights(layer_collection['S2'])
+final_weights = nw.update_shared_weights(layer_collection['S2'])
+reconstruction = vis.reconstruct_S2_features(final_weights, feature_imgs_dict)
+
+cv2.imwrite('S2_reconstructions/{}.png'.format(plb.Path(args.target_name).stem),
+            reconstruction)
 
 t1 = time.clock()
 print('Plotting spikes')

@@ -538,12 +538,12 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    rng = rnd.RandomDistribution('normal', mu=.05, sigma=.01)
+    rng = rnd.RandomDistribution('normal', mu=.02, sigma=.006)
     rng2 = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
-        n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
+        n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s // 2)
         i_offsets = list(map(lambda x: rng2.next(), range(n * m)))
         print('S2 Shape', n, m)
         S2_layer = Layer(sim.Population(n * m,
@@ -573,7 +573,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                                sim.StaticSynapse(weight=-5))
     return S2_layers
 
-def update_shared_weights(S2_layers: Dict[float, Layer]) -> None:
+def update_shared_weights(S2_layers: Dict[float, Layer]) -> Dict[str, np.array]:
     """
     Updates the weights of the "shared" projections of the S2 neurons.
 
@@ -603,3 +603,5 @@ def update_shared_weights(S2_layers: Dict[float, Layer]) -> None:
             for proj in projections:
                 proj.set(weight=active_layer.projections[label][first_neuron]\
                                                             .get('weight', 'array'))
+    return dict([(label, projections[first_neuron].get('weight', 'array'))\
+                    for label, projections in active_layer.projections.items()])

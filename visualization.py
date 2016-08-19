@@ -1,3 +1,4 @@
+from typing import Dict, Sequence, List
 import numpy as np
 import pathlib as plb
 import pyNN.utility.plotting as plt
@@ -218,6 +219,25 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
             cv2.imwrite(output_dir.as_posix() + '/{}_{}_C1_{}_reconstruction.png'.\
                         format(img_name_stem, size, feature_label), img)
 
+def reconstruct_S2_features(weights_dict: Dict[str, np.array],
+                            feature_imgs_dict: Dict[str, np.array]) -> np.array:
+    """
+    Reconstructs the weights of the S2 prototype neurons using the features
+    passed feature images
+
+    Parameters:
+        `weights`: 
+    """
+    # Determine the highest intensity
+    max_weight = max([max(layer_weights.ravel())\
+                        for layer_weights in weights_dict.values()])
+    canvas = np.zeros( (97, 97) )
+    for label, weights in weights_dict.items():
+        for i in range(len(weights)):
+            copy_to_visualization(i, weights[i][0] / max_weight,
+                                  feature_imgs_dict[label], canvas, (16, 16), 6)
+    return canvas
+
 def plot_spikes(layer_collection, args):
     """
     Plots the spikes of the layers in the given dictionary
@@ -232,7 +252,7 @@ def plot_spikes(layer_collection, args):
         `args`: The commandline arguments object. Uses the target image name
                 from it
     """
-    for layer_name in ['C1']:
+    for layer_name in []:
         if layer_name in layer_collection:
             for size, layers in layer_collection[layer_name].items():
                 spike_panels = []
