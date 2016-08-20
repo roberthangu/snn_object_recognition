@@ -377,7 +377,54 @@ def create_input_layers_for_scales(target, scales, is_bag=False):
     change_rates_for_scales(input_layers, target)
     return input_layers
 
-def create_gabor_input_layers_for_scales(target, scales):
+def set_i_offsets_for_all_scales_to(layers_dict: Dict[float, Sequence[Layer]],
+                                    target: np.array) -> None:
+    """
+    Sets the i_offsets of the layers to the intensities of the gabor filtered
+    target image.
+
+    Parameters:
+        `layers_dict`: A dictionary containing for each size a list of layers,
+                       for each gabor filter orientation one.
+                  
+        `target`: The unfiltered image to create the gabor convoltions from
+    """
+    for size, layers in layers_dict.items():
+        resized_target = cv2.resize(src=target, dsize=None, fx=size, fy=size,
+                                    interpolation=cv2.INTER_AREA)
+        filtered_imgs_dict = cm.get_gabor_edges(resized_target)
+        for layer in layers:
+            set_i_offsets(layer, filtered_imgs_dict[layer.population.label])
+
+def create_empty_input_layers_for_scales(target: np.array, scales: [float])\
+        -> Dict[float, List[Layer]]:
+    """
+    Creates empty input layers from the target image shape for every scale in
+    the passed list.
+
+    Parameters:
+        `target`: The target image from which to compute the gabor filters and
+                  create the input layers
+
+        `scales`: A list of the scales for which to create input layers
+    
+    Returns:
+        A dictionary which contains for each scale a list of four input layers,
+        one for each orientation
+    """
+    input_layers = {}
+    feature_names = cm.get_gabor_feature_names()
+    for size in scales:
+        print('Creating input layers for size', size)
+        n = round(target.shape[0] * size)
+        m = round(target.shape[1] * size)
+        input_layers[size] = [Layer(sim.Population(n * m, sim.IF_curr_exp(),
+                                label=feature_name), (n, m))\
+                              for feature_name in feature_names] 
+    return input_layers
+    
+def create_gabor_input_layers_for_scales(target: np.array, scales: [float])\
+        -> Dict[float, List[Layer]]:
     """
     Creates input layers from the given image by using gabor filters in four
     orientations. The firing rate of the neurons is controlled by the i_offsets
@@ -393,19 +440,8 @@ def create_gabor_input_layers_for_scales(target, scales):
         A dictionary which contains for each scale a list of four input layers,
         one for each orientation
     """
-    input_layers = {}
-    for size in scales:
-        print('Creating input layers for size', size)
-        resized_target = cv2.resize(src=target, dsize=None, fx=size, fy=size,
-                                    interpolation=cv2.INTER_AREA)
-        current_feature_layers = []
-        for name, edge_img in cm.get_gabor_edges(resized_target).items():
-            n, m = resized_target.shape
-            layer = Layer(sim.Population(n * m, sim.IF_curr_exp()), (n, m))
-            layer.population.label = name
-            set_i_offsets(layer, edge_img)
-            current_feature_layers.append(layer)
-        input_layers[size] = current_feature_layers
+    input_layers = create_empty_input_layers_for_scales(target, scales)
+    set_i_offsets_for_all_scales_to(input_layers, target)
     return input_layers
 
 def create_S1_layers(input_layers_dict, weights_dict, args):
@@ -538,13 +574,13 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    rng = rnd.RandomDistribution('normal', mu=.02, sigma=.006)
-    rng2 = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
-    weights = list(map(lambda x: [rng.next()], range(f_s * f_s)))
+    weight_rng = rnd.RandomDistribution('normal', mu=.02, sigma=.006)
+    i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
+    weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s // 2)
-        i_offsets = list(map(lambda x: rng2.next(), range(n * m)))
+        i_offsets = list(map(lambda x: i_offset_rng.next(), range(n * m)))
         print('S2 Shape', n, m)
         S2_layer = Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(tau_refrac=args.refrac_s2,

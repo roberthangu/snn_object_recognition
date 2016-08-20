@@ -55,6 +55,8 @@ def parse_args():
     parser.add_argument('--target-name', type=str,
                         help='The name of the already edge-filtered image to\
                               be recognized')
+    parser.add_argument('--training-dir', type=str,
+                        help='The directory with the training images')
     args = parser.parse_args()
     print(args)
     return args
@@ -85,6 +87,12 @@ def filter_img(target_img, filter_type):
         edge_detected = cv2.sqrt(dx * dx + dy * dy)
         filtered_img = cv2.convertScaleAbs(edge_detected)
     return filtered_img
+
+def get_gabor_feature_names():
+    """
+    Returns the feature names of the gabor filtered images
+    """
+    return ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
     
 def get_gabor_edges(target_img):
     """
@@ -100,7 +108,7 @@ def get_gabor_edges(target_img):
     """
     angles = [np.pi / 8, np.pi / 4 + np.pi / 8, np.pi / 2 +  np.pi / 8,
               3 * np.pi / 4 + np.pi / 8]
-    feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
+    feature_names = get_gabor_feature_names()
     return dict([(name,
                   cv2.convertScaleAbs(\
                     cv2.filter2D(target_img, cv2.CV_64F,
