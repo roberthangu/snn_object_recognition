@@ -574,17 +574,16 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    weight_rng = rnd.RandomDistribution('normal', mu=.02, sigma=.006)
+    weight_rng = rnd.RandomDistribution('normal', mu=.021, sigma=.006)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
     for size, layers in C1_layers.items():
-        n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s // 2)
+        n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         i_offsets = list(map(lambda x: i_offset_rng.next(), range(n * m)))
         print('S2 Shape', n, m)
         S2_layer = Layer(sim.Population(n * m,
-                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2,
-                                                     i_offset=i_offsets),
+                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=size), (n, m))
         for layer in layers:
@@ -617,16 +616,17 @@ def update_shared_weights(S2_layers: Dict[float, Layer]) -> Dict[str, np.array]:
         `S2_layers`: A dictionary containing for each size the corresponding S2
                      layer
     """
-    earliest_spike = 50
+    earliest_spike = np.infty
     first_neuron = 0
     active_layer = None
     # Determine the neuron that fired first and the layer it is in
     for size, current_layer in S2_layers.items():
-        current_spiketrains = current_layer.population.get_data().segments[0]\
-                                                                 .spiketrains
+        current_spiketrains = current_layer.population.get_data(clear=True)\
+                                                      .segments[0].spiketrains
         for i in range(len(current_spiketrains)):
             if len(current_spiketrains[i]) > 0\
                     and current_spiketrains[i][0] < earliest_spike:
+                print(current_spiketrains[i][0])
                 earliest_spike = current_spiketrains[i][0]
                 first_neuron = i
                 active_layer = current_layer
@@ -634,10 +634,14 @@ def update_shared_weights(S2_layers: Dict[float, Layer]) -> Dict[str, np.array]:
 #        print(projections[first_neuron].get('weight', 'array'))
 
     # Copy the weights of the neuron in the active layer to all other S2 layers
-    for current_layer in S2_layers.values():
-        for label, projections in current_layer.projections.items():
-            for proj in projections:
-                proj.set(weight=active_layer.projections[label][first_neuron]\
-                                                            .get('weight', 'array'))
+    if earliest_spike < np.infty:
+        for current_layer in S2_layers.values():
+            for label, projections in current_layer.projections.items():
+                for proj in projections:
+                    proj.set(weight=active_layer.projections[label][first_neuron]\
+                                                        .get('weight', 'array'))
+    if earliest_spike == np.infty:
+        return dict([(label, projections[first_neuron].get('weight', 'array'))\
+            for label, projections in list(S2_layers.values())[0].projections.items()])
     return dict([(label, projections[first_neuron].get('weight', 'array'))\
                     for label, projections in active_layer.projections.items()])

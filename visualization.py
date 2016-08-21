@@ -2,6 +2,7 @@ from typing import Dict, Sequence, List
 import numpy as np
 import pathlib as plb
 import pyNN.utility.plotting as plt
+import network as nw
 import cv2
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
@@ -238,43 +239,49 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
                                   feature_imgs_dict[label], canvas, (16, 16), 6)
     return canvas
 
-def plot_spikes(layer_collection, args):
+def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
+        -> None:
     """
     Plots the spikes of the layers in the given dictionary
 
 
     Arguments:
 
-        `layer_collection`: A dictionary containing for each layer name a
-                            dictionary containing for each size of the target a
-                            list of S1 layers
+        `C1_layers`: The C1 layers
 
-        `args`: The commandline arguments object. Uses the target image name
-                from it
+        `image_name`: The name of the image that will be written. This string
+                      will be a part of the actual plot file name.
     """
-    for layer_name in []:
-        if layer_name in layer_collection:
-            for size, layers in layer_collection[layer_name].items():
-                spike_panels = []
-                for layer in layers:
-                    out_data = layer.population.get_data().segments[0]
-                    spike_panels.append(plt.Panel(out_data.spiketrains,
-                                                  xticks=True, yticks=True,
-                                                  xlabel='{}, {} scale layer'.format(\
-                                                            layer.population.label, size)))
-                plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-                                                        layer_name,
-                                                        plb.Path(args.target_name).stem,
-                                                        size))
-    if 'S2' in layer_collection:
+    spike_panels = []
+    for size, layers in C1_layers.items():
         spike_panels = []
-        for size, layer in layer_collection['S2'].items():
+        for layer in layers:
             out_data = layer.population.get_data().segments[0]
-            spike_panels.append(plt.Panel(out_data.spiketrains,
-                                          xticks=True, yticks=True,
-                                          xlabel='{} scale layer'.format(size)))
-            spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
-                                          xticks=True, yticks=True,
-                                          xlabel='{} scale layer'.format(size)))
-        plt.Figure(*spike_panels).save('plots/S2_{}.png'.format(\
-                                               plb.Path(args.target_name).stem))
+            spike_panels.append(plt.Panel(out_data.spiketrains, xticks=True,
+                                          yticks=True,
+                                          xlabel='{}, {} scale layer'.format(\
+                                                layer.population.label, size)))
+        plt.Figure(*spike_panels).save('plots/C1_{}_{}_scale.png'.format(\
+                                                image_name, size))
+
+def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
+        -> None:
+    """
+    Plots the S2 spikes
+
+    Parameters:
+        `S2_layers`: A dictionary with the S2 layers
+
+        `image_name`: The name of the image that will be written. This string
+                      will be a part of the actual plot file name.
+    """
+    spike_panels = []
+    for size, layer in S2_layers.items():
+        out_data = layer.population.get_data().segments[0]
+        spike_panels.append(plt.Panel(out_data.spiketrains,
+                                      xticks=True, yticks=True,
+                                      xlabel='{} scale layer'.format(size)))
+        spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
+                                      xticks=True, yticks=True,
+                                      xlabel='{} scale layer'.format(size)))
+        plt.Figure(*spike_panels).save('plots/S2_{}.png'.format(image_name))
