@@ -64,9 +64,11 @@ start_time = time.clock()
 count = 0
 for filename, target_img in imgs[0:args.image_count]:
     print('Simulating for', filename, 'number', count)
+    t1 = time.clock()
     count += 1
     nw.set_i_offsets_for_all_scales_to(layer_collection['S1'], target_img)
     sim.run(args.sim_time)
+    print('Took', time.clock() - t1, 'seconds')
 end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
