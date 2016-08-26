@@ -31,7 +31,7 @@ parser.add_argument('--refrac-c1', type=float, default=.1, metavar='0.1',
                     ms')
 parser.add_argument('--sim-time', default=50, type=float, help='Simulation time',
                     metavar='50')
-parser.add_argument('--scales', default=[1.0, 0.71, 0.5, 0.35, 0.25],
+parser.add_argument('--scales', default=[1.0, 0.71, 0.5, 0.35],
                     nargs='+', type=float,
                     help='A list of image scales for which to create\
                     layers. Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
