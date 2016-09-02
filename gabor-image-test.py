@@ -5,21 +5,33 @@ import sys
 import pyNN.nest as sim
 import pathlib as plb
 import time
+import argparse as ap
 
 import common as cm
 import network as nw
 import visualization as vis
 import time
 
-args = cm.parse_args()
-
-#gabor_edges = cm.get_gabor_edges(cv2.imread(args.target_name, cv2.CV_8UC1))
-#
-#for edge_name, img in gabor_edges.items():
-#    filename = 'edges/{}_gabor_{}.png'.format(plb.Path(args.target_name).stem,
-#                                              edge_name)
-#    if not plb.Path(filename).exists():
-#        cv2.imwrite(filename, img)
+parser = ap.ArgumentParser(description='SNN feature detector')
+parser.add_argument('--refrac-c1', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the C1 layer in ms')
+parser.add_argument('--refrac-s1', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the S1 layer in ms')
+parser.add_argument('--refrac-s2', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the S2 layer in ms')
+parser.add_argument('--scales', default=[1.0, 0.71, 0.5, 0.35, 0.25],
+                    nargs='+', type=float,
+                    help='A list of image scales for which to create layers.\
+                    Defaults to [1, 0.71, 0.5, 0.35, 0.25]')
+parser.add_argument('--plot-c1-spikes', action='store_true',
+                    help='Plot the spike trains of the C1 layers')
+parser.add_argument('--plot-s2-spikes', action='store_true',
+                    help='Plot the spike trains of the S2 layers')
+parser.add_argument('--sim-time', default=100, type=float, help='Simulation time')
+parser.add_argument('--target-name', type=str,
+                    help='The name of the already edge-filtered image to be\
+                    recognized')
+args = parser.parse_args()
 
 sim.setup(threads=4)
 
@@ -44,7 +56,6 @@ print('Creating S2 layers')
 t1 = time.clock()
 layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], args)
 print('S2 creation took {} s'.format(time.clock() - t1))
-#create_S2_inhibition(layer_collection['S2'])
 
 for layer_name in ['C1']:
     if layer_name in layer_collection:
@@ -61,26 +72,15 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
-#feature_names = ['slash', 'horiz_slash', 'horiz_backslash', 'backslash']
-#feature_imgs_dict = dict([(name, np.zeros((1,1))) for name in feature_names])
-#
-#t1 = time.clock()
-#vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
-#                            args)
-#print('C1 visualization took {} s'.format(time.clock() - t1))
-
-print('Spiketrains of the S2 layer:')
-for size in args.scales:
-    print('For size', size)
-    S2_spiketrains = layer_collection['S2'][size].population.get_data()\
-        .segments[0].spiketrains
-    for spiketrain in S2_spiketrains:
-        print(spiketrain)
-
 t1 = time.clock()
-if args.plot_spikes:
-    print('Plotting spikes')
-    vis.plot_spikes(layer_collection, args)
+if args.plot_c1_spikes:
+    print('Plotting C1 spikes')
+    vis.plot_C1_spikes(layer_collection['C1'], plb.Path(args.target_name).stem)
+    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
+
+if args.plot_s2_spikes:
+    print('Plotting S2 spikes')
+    vis.plot_S2_spikes(layer_collection['S2'], plb.Path(args.target_name).stem)
     print('Plotting spiketrains took {} s'.format(time.clock() - t1))
 
 sim.end()
