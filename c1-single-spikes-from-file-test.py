@@ -30,6 +30,12 @@ parser.add_argument('--target-name', type=str,
 args = parser.parse_args()
 
 sim.setup(threads=4)
+#
+# Read the gabor features for reconstruction
+feature_imgs_dict = {} # feature string -> image
+for filepath in plb.Path('features_gabor').iterdir():
+    feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
+                                                  cv2.CV_8UC1)
 
 layer_collection = {}
 
@@ -68,6 +74,17 @@ sim.run(args.sim_time)
 end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
+
+for size, layer in layer_collection['S2'].items():
+    for i in range(len(list(layer.projections.values())[0])):
+        print('Reconstructing S2 features for size', size, 'feature', i)
+        reconstruction = vis.reconstruct_S2_features(\
+            dict([(label, projections[i].get('weight', 'array'))\
+                for label, projections in layer.projections.items()]),
+            feature_imgs_dict)
+        cv2.imwrite('S2_reconstructions/{}_{}_{}.png'.format(\
+                        plb.Path(args.target_name).stem, size, i),
+                        reconstruction)
 
 t1 = time.clock()
 if args.plot_c1_spikes:

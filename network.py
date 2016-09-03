@@ -142,8 +142,8 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
 
     if stdp:
         td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                               A_plus=0.01, A_minus=0.012)
-        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.5)
+                               A_plus=0.0025, A_minus=0.00125)
+        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.6)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(),
@@ -574,7 +574,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    weight_rng = rnd.RandomDistribution('normal', mu=.1, sigma=.03)
+    weight_rng = rnd.RandomDistribution('normal', mu=.06, sigma=.003)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
@@ -593,7 +593,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         S2_layers[size] = S2_layer
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = -3
+    inh_weight = 0
     print('Create S2 self inhibitory connections')
     for layer in S2_layers.values():
         sim.Projection(layer.population, layer.population,

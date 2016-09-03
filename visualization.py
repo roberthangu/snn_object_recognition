@@ -227,7 +227,11 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
     passed feature images
 
     Parameters:
-        `weights`: 
+        `weights_dict`: A dictionary containing for each feature name the
+                        connection weights from the S2 layer to the C1 layer of
+                        that feature
+        `filtered_imgs_dict`: A dictionary containing for each feature name an
+                              image of the feature
     """
     # Determine the highest intensity
     max_weight = max([max(layer_weights.ravel())\
