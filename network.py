@@ -527,7 +527,7 @@ def create_C1_layers(S1_layers_dict: Dict[float, Sequence[Layer]],
         C1_subsampling_shape = (7, 7)
         neuron_number = C1_subsampling_shape[0] * C1_subsampling_shape[1]
         move = 6
-        C1_weight = 5
+        C1_weight = .35
         weights_tuple = (C1_weight * np.ones((neuron_number, 1)),
                          C1_subsampling_shape)
         t1 = time.clock()
@@ -574,7 +574,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    weight_rng = rnd.RandomDistribution('normal', mu=.021, sigma=.006)
+    weight_rng = rnd.RandomDistribution('normal', mu=.1, sigma=.03)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
@@ -593,11 +593,12 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         S2_layers[size] = S2_layer
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
+    inh_weight = -3
     print('Create S2 self inhibitory connections')
     for layer in S2_layers.values():
         sim.Projection(layer.population, layer.population,
                        sim.AllToAllConnector(allow_self_connections=False),
-                       sim.StaticSynapse(weight=-5))
+                       sim.StaticSynapse(weight=inh_weight))
     # ...and between the layers
     print('Create S2 cross-scale inhibitory connections')
     for layer1 in S2_layers.values():
@@ -605,7 +606,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
             if layer1 != layer2:
                 sim.Projection(layer1.population, layer2.population,
                                sim.AllToAllConnector(),
-                               sim.StaticSynapse(weight=-5))
+                               sim.StaticSynapse(weight=inh_weight))
     return S2_layers
 
 def update_shared_weights(S2_layers: Dict[float, Layer]) -> Dict[str, np.array]:

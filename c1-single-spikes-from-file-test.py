@@ -16,32 +16,22 @@ import time
 parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
 parser.add_argument('--c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains')
-parser.add_argument('--dataset-label', type=str, required=True,
-                    help='The name of the dataset which was used for\
-                    training')
-parser.add_argument('--image-count', type=int, required=True,
-                    help='The number of images to read from the training\
-                    directory')
 parser.add_argument('--plot-c1-spikes', action='store_true',
                     help='Plot the spike trains of the C1 layers')
 parser.add_argument('--plot-s2-spikes', action='store_true',
                     help='Plot the spike trains of the S2 layers')
-parser.add_argument('--refrac-s2', type=float, default=.1, metavar='.1',
-                    help='The refractory period of neurons in the S2 layer in\
-                    ms')
+parser.add_argument('--refrac-s2', type=float, default=.1, metavar='MS',
+                    help='The refractory period of neurons in the S2 layer in ms')
 parser.add_argument('--sim-time', default=50, type=float, metavar='50',
                      help='Simulation time')
+parser.add_argument('--target-name', type=str,
+                    help='The name of the already edge-filtered image to be\
+                    recognized')
 args = parser.parse_args()
 
 sim.setup(threads=4)
 
 layer_collection = {}
-
-# Read the gabor features for reconstruction
-feature_imgs_dict = {} # feature string -> image
-for filepath in plb.Path('features_gabor').iterdir():
-    feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
-                                                  cv2.CV_8UC1)
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -74,24 +64,20 @@ for layer in layer_collection['S2'].values():
 
 print('========= Start simulation =========')
 start_time = time.clock()
-for i in range(args.image_count):
-    print('Simulating for image number', i)
-    sim.run(args.sim_time)
-    if args.plot_c1_spikes:
-        vis.plot_C1_spikes(layer_collection['C1'],
-                           '{}_image_{}'.format(args.dataset_label, i),
-                           clear=True)
-    if args.plot_s2_spikes:
-        vis.plot_S2_spikes(layer_collection['S2'], 
-                           '{}_image_{}'.format(args.dataset_label, i))
-    updated_weights = nw.update_shared_weights(layer_collection['S2'])
-    if (i + 1) % 10 == 0:
-        cv2.imwrite('S2_reconstructions/{}_{}_images.png'.format(args.dataset_label,
-                                                                 i + 1),
-                    vis.reconstruct_S2_features(updated_weights,
-                                                feature_imgs_dict))
+sim.run(args.sim_time)
 end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
+
+t1 = time.clock()
+if args.plot_c1_spikes:
+    print('Plotting C1 spikes')
+    vis.plot_C1_spikes(layer_collection['C1'], plb.Path(args.target_name).stem)
+    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
+
+if args.plot_s2_spikes:
+    print('Plotting S2 spikes')
+    vis.plot_S2_spikes(layer_collection['S2'], plb.Path(args.target_name).stem)
+    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
 
 sim.end()
