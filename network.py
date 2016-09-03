@@ -142,8 +142,8 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
 
     if stdp:
         td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                               A_plus=0.01, A_minus=0.012)
-        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.5)
+                               A_plus=.01, A_minus=.012)
+        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.04)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(),
@@ -574,7 +574,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size the S2 layer
     """
     f_s = 16
-    weight_rng = rnd.RandomDistribution('normal', mu=.021, sigma=.006)
+    weight_rng = rnd.RandomDistribution('normal', mu=.015, sigma=.005)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
