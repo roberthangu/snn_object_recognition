@@ -82,11 +82,11 @@ layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], args)
 if is_root():
     print('S2 creation took {} s'.format(time.clock() - t1))
 
-#for layers in layer_collection['C1'].values():
-#    for layer in layers:
-#        layer.population.record('spikes')
+for layers in layer_collection['C1'].values():
+    for layer in layers:
+        layer.population.record('spikes')
 for layer in layer_collection['S2'].values():
-    layer.population.record(['spikes'])
+    layer.population.record(['spikes', 'v'])
 
 if is_root():
     print('========= Start simulation =========')

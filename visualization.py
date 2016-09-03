@@ -239,8 +239,8 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
                                   feature_imgs_dict[label], canvas, (16, 16), 6)
     return canvas
 
-def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
-        -> None:
+def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
+                   clear=False) -> None:
     """
     Plots the spikes of the layers in the given dictionary
 
@@ -256,7 +256,7 @@ def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
     for size, layers in C1_layers.items():
         spike_panels = []
         for layer in layers:
-            out_data = layer.population.get_data().segments[0]
+            out_data = layer.population.get_data(clear=clear).segments[0]
             spike_panels.append(plt.Panel(out_data.spiketrains, xticks=True,
                                           yticks=True,
                                           xlabel='{}, {} scale layer'.format(\
