@@ -142,8 +142,8 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
 
     if stdp:
         td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                               A_plus=.01, A_minus=.012)
-        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.04)
+                               A_plus=0.01, A_minus=0.012)
+        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.5)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(),
