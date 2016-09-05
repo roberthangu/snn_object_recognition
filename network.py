@@ -560,9 +560,9 @@ def create_local_inhibition(layers_dict):
                 space=space.Space(axes='xy')) 
 
 def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace)\
-        -> Dict[float, Layer]:
+        -> Dict[float, List[Layer]]:
     """
-    Creates the S2 layers for all sizes
+    Creates all prototype S2 layers for all sizes.
 
     Parameters:
         `layers_dict`: A dictionary containing for each size a list of C1
@@ -571,7 +571,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         `args`: The command-line arguments object
 
     Returns:
-        A dictionary containing for each size the S2 layer
+        A dictionary containing for each size a list of different S2
+        layers, for each prototype one.
     """
     f_s = 16
     weight_rng = rnd.RandomDistribution('normal', mu=.06, sigma=.003)
@@ -582,67 +583,99 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         i_offsets = list(map(lambda x: i_offset_rng.next(), range(n * m)))
         print('S2 Shape', n, m)
-        S2_layer = Layer(sim.Population(n * m,
+        layer_list = list(map(lambda i: Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
-                                     label=size), (n, m))
-        for layer in layers:
-            S2_layer.projections[layer.population.label] =\
-                connect_layer_to_layer(layer, S2_layer, (f_s, f_s), f_s,
-                                       weights, stdp=True)
-        S2_layers[size] = S2_layer
+                                     label=i), (n, m)),
+                              range(args.s2_prototype_cells)))
+        for S2_layer in layer_list:
+            for C1_layer in layers:
+                S2_layer.projections[C1_layer.population.label] =\
+                    connect_layer_to_layer(C1_layer, S2_layer, (f_s, f_s), f_s,
+                                           weights, stdp=True)
+        S2_layers[size] = layer_list
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = 0
+    inh_weight = -1
     print('Create S2 self inhibitory connections')
-    for layer in S2_layers.values():
-        sim.Projection(layer.population, layer.population,
-                       sim.AllToAllConnector(allow_self_connections=False),
-                       sim.StaticSynapse(weight=inh_weight))
+    for layer_list in S2_layers.values():
+        for layer in layer_list:
+            sim.Projection(layer.population, layer.population,
+                           sim.AllToAllConnector(allow_self_connections=False),
+                           sim.StaticSynapse(weight=inh_weight))
     # ...and between the layers
     print('Create S2 cross-scale inhibitory connections')
-    for layer1 in S2_layers.values():
-        for layer2 in S2_layers.values():
-            if layer1 != layer2:
-                sim.Projection(layer1.population, layer2.population,
-                               sim.AllToAllConnector(),
-                               sim.StaticSynapse(weight=inh_weight))
+    for i in range(args.s2_prototype_cells):
+        for layer_list1 in S2_layers.values():
+            for layer_list2 in S2_layers.values():
+                if layer_list1[i] != layer_list2[i]:
+                    sim.Projection(layer_list1[i].population,
+                                   layer_list2[i].population,
+                                   sim.AllToAllConnector(),
+                                   sim.StaticSynapse(weight=inh_weight))
+    # Create the inhibition between different prototype layers
+    print('Create S2 cross-prototype inhibitory connections')
+    for layer_list in S2_layers.values():
+        for layer1 in layer_list:
+            for layer2 in layer_list:
+                if layer1 != layer2:
+                    sim.Projection(layer1.population, layer2.population,
+                                   sim.OneToOneConnector(),
+                                   sim.StaticSynapse(weight=inh_weight))
     return S2_layers
 
-def update_shared_weights(S2_layers: Dict[float, Layer]) -> Dict[str, np.array]:
+def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
+                          s2_prototype_cells: int)\
+        -> List[Dict[str, np.array]]:
     """
     Updates the weights of the "shared" projections of the S2 neurons.
 
     Parameters:
         `S2_layers`: A dictionary containing for each size the corresponding S2
                      layer
-    """
-    earliest_spike = np.infty
-    first_neuron = 0
-    active_layer = None
-    # Determine the neuron that fired first and the layer it is in
-    for size, current_layer in S2_layers.items():
-        current_spiketrains = current_layer.population.get_data(clear=True)\
-                                                      .segments[0].spiketrains
-        for i in range(len(current_spiketrains)):
-            if len(current_spiketrains[i]) > 0\
-                    and current_spiketrains[i][0] < earliest_spike:
-                print(current_spiketrains[i][0])
-                earliest_spike = current_spiketrains[i][0]
-                first_neuron = i
-                active_layer = current_layer
-#    for label, projections in active_layer.projections.items():
-#        print(projections[first_neuron].get('weight', 'array'))
+        `s2_prototype_cells`: The number of S2 prototype cells
 
-    # Copy the weights of the neuron in the active layer to all other S2 layers
-    if earliest_spike < np.infty:
-        for current_layer in S2_layers.values():
-            for label, projections in current_layer.projections.items():
-                for proj in projections:
-                    proj.set(weight=active_layer.projections[label][first_neuron]\
-                                                        .get('weight', 'array'))
-    if earliest_spike == np.infty:
-        return dict([(label, projections[first_neuron].get('weight', 'array'))\
-            for label, projections in list(S2_layers.values())[0].projections.items()])
-    return dict([(label, projections[first_neuron].get('weight', 'array'))\
-                    for label, projections in active_layer.projections.items()])
+    Returns:
+        A list containing for each prototype the weights of the connections of
+        the neuron which fired first of the respective prototype.
+    """
+    weights_dict_list = []
+    for i in range(s2_prototype_cells):
+        earliest_spike = np.infty
+        first_neuron = 0
+        active_layer = None
+        # Determine the neuron that fired first and the layer it is in
+        for layer_list in S2_layers.values():
+            current_layer = layer_list[i]
+            current_spiketrains = current_layer.population.get_data(clear=True)\
+                                                          .segments[0].spiketrains
+            for j in range(len(current_spiketrains)):
+                if len(current_spiketrains[j]) > 0\
+                        and current_spiketrains[j][0] < earliest_spike:
+                    print(current_spiketrains[j][0])
+                    earliest_spike = current_spiketrains[j][0]
+                    first_neuron = j
+                    active_layer = current_layer
+#       for label, projections in active_layer.projections.items():
+#           print(projections[first_neuron].get('weight', 'array'))
+
+        # Copy the weights of the neuron in the active layer to all other S2 layers
+        if earliest_spike < np.infty:
+            for layer_list in S2_layers.values():
+                current_layer = layer_list[i]
+                for label, projections in current_layer.projections.items():
+                    for proj in projections:
+                        proj.set(weight=active_layer.projections[label][first_neuron]\
+                                                            .get('weight', 'array'))
+        # If no earliest spike was found, for e.g. if no neuron fired, take the
+        # weights of any neuron from the population, e.g. the first one.
+        if earliest_spike == np.infty:
+            weights_dict_list.append(\
+                dict([(label, projections[first_neuron].get('weight', 'array'))\
+                for label, projections in\
+                    list(S2_layers.values())[0][i].projections.items()]))
+        else:
+            weights_dict_list.append(\
+                dict([(label, projections[first_neuron].get('weight', 'array'))\
+                    for label, projections in active_layer.projections.items()]))
+    return weights_dict_list

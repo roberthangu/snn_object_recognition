@@ -25,6 +25,8 @@ parser.add_argument('--c1-dumpfile', type=str, required=True,
 parser.add_argument('--dataset-label', type=str, required=True,
                     help='The name of the dataset which was used for\
                     training')
+parser.add_argument('--s2-prototype-cells', type=int, default=3,
+                    help='The number of S2 features to compute')
 parser.add_argument('--image-count', type=int, required=True,
                     help='The number of images to read from the training\
                     directory')
@@ -85,20 +87,25 @@ if is_root():
 for layers in layer_collection['C1'].values():
     for layer in layers:
         layer.population.record('spikes')
-for layer in layer_collection['S2'].values():
-    layer.population.record(['spikes', 'v'])
+for layer_list in layer_collection['S2'].values():
+    for layer in layer_list:
+        layer.population.record(['spikes', 'v'])
 
 dataset_label = '{}_{}imgs_{}ms'.format(args.dataset_label, args.image_count,
                                         int(args.sim_time))
-reconstructions_dir_path = plb.Path('S2_reconstructions/' + dataset_label)
-if not reconstructions_dir_path.exists():
-    reconstructions_dir_path.mkdir()
+reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
+for i in range(args.s2_prototype_cells):
+    reconstructions_dir_path = reconstructions_dir_dataset_path / str(i)
+    if not reconstructions_dir_path.exists():
+        reconstructions_dir_path.mkdir(parents=True)
 c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
 if not c1_plots_dir_path.exists():
     c1_plots_dir_path.mkdir()
-s2_plots_dir_path = plb.Path('plots/S2/' + dataset_label)
-if not s2_plots_dir_path.exists():
-    s2_plots_dir_path.mkdir()
+s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
+for i in range(args.s2_prototype_cells):
+    s2_plots_dir_path = s2_plots_dataset_dir / str(i)
+    if not s2_plots_dir_path.exists():
+        s2_plots_dir_path.mkdir(parents=True)
 
 if is_root():
     print('========= Start simulation =========')
@@ -113,19 +120,30 @@ for i in range(args.image_count):
                                '{}_image_{}'.format(dataset_label, i),
                                out_dir_name=c1_plots_dir_path.as_posix())
         if args.plot_s2_spikes:
-            vis.plot_S2_spikes(layer_collection['S2'], 
-                               '{}_image_{}'.format(dataset_label, i),
-                               s2_plots_dir_path.as_posix())
-    updated_weights = nw.update_shared_weights(layer_collection['S2'])
+            vis.plot_S2_spikes(layer_collection['S2'],
+                           '{}_image_{}'.format(dataset_label, i),
+                           args.s2_prototype_cells,
+                           out_dir_name=s2_plots_dataset_dir.as_posix())
+    updated_weights = nw.update_shared_weights(layer_collection['S2'],
+                                               args.s2_prototype_cells)
     if is_root():
         if (i + 1) % 10 == 0:
-            cv2.imwrite('{}/{}_{}_images.png'.format(reconstructions_dir_path.as_posix(),
-                                                     dataset_label, i + 1),
-                        vis.reconstruct_S2_features(updated_weights,
-                                                    feature_imgs_dict))
+            for j in range(args.s2_prototype_cells):
+                cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
+                        (reconstructions_dir_dataset_path / str(j)).as_posix(),
+                         dataset_label, j, i + 1),
+                    vis.reconstruct_S2_features(updated_weights[j],
+                                                feature_imgs_dict))
 if is_root():
     end_time = time.clock()
     print('========= Stop  simulation =========')
     print('Simulation took', end_time - start_time, 's')
+
+# Reconstruct the last image
+for j in range(args.s2_prototype_cells):
+    cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
+                        (reconstructions_dir_dataset_path / str(j)).as_posix(),
+                        dataset_label, j, i + 1),
+            vis.reconstruct_S2_features(updated_weights[j], feature_imgs_dict))
 
 sim.end()
