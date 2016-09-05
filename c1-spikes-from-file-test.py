@@ -88,6 +88,18 @@ for layers in layer_collection['C1'].values():
 for layer in layer_collection['S2'].values():
     layer.population.record(['spikes', 'v'])
 
+dataset_label = '{}_{}imgs_{}ms'.format(args.dataset_label, args.image_count,
+                                        int(args.sim_time))
+reconstructions_dir_path = plb.Path('S2_reconstructions/' + dataset_label)
+if not reconstructions_dir_path.exists():
+    reconstructions_dir_path.mkdir()
+c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
+if not c1_plots_dir_path.exists():
+    c1_plots_dir_path.mkdir()
+s2_plots_dir_path = plb.Path('plots/S2/' + dataset_label)
+if not s2_plots_dir_path.exists():
+    s2_plots_dir_path.mkdir()
+
 if is_root():
     print('========= Start simulation =========')
     start_time = time.clock()
@@ -98,15 +110,17 @@ for i in range(args.image_count):
     if is_root():
         if args.plot_c1_spikes:
             vis.plot_C1_spikes(layer_collection['C1'],
-                               '{}_image_{}'.format(args.dataset_label, i))
+                               '{}_image_{}'.format(dataset_label, i),
+                               out_dir_name=c1_plots_dir_path.as_posix())
         if args.plot_s2_spikes:
             vis.plot_S2_spikes(layer_collection['S2'], 
-                               '{}_image_{}'.format(args.dataset_label, i))
+                               '{}_image_{}'.format(dataset_label, i),
+                               s2_plots_dir_path.as_posix())
     updated_weights = nw.update_shared_weights(layer_collection['S2'])
     if is_root():
         if (i + 1) % 10 == 0:
-            cv2.imwrite('S2_reconstructions/{}_{}_images.png'.format(args.dataset_label,
-                                                                     i + 1),
+            cv2.imwrite('{}/{}_{}_images.png'.format(reconstructions_dir_path.as_posix(),
+                                                     dataset_label, i + 1),
                         vis.reconstruct_S2_features(updated_weights,
                                                     feature_imgs_dict))
 if is_root():

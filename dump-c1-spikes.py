@@ -106,8 +106,8 @@ for size, layers in layer_collection['C1'].items():
     filename += '_{}'.format(size)
 
 if is_root():
-    dumpfile = open('{}_{}ms_{}_images.bin'.format(filename, args.sim_time,
-                                                   args.image_count), 'wb')
+    dumpfile = open('{}_{}imgs_{}ms.bin'.format(filename, args.image_count,
+                                                   args.sim_time), 'wb')
     pickle.dump(ddict, dumpfile, protocol=4)
     dumpfile.close()
 

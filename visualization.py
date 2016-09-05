@@ -244,7 +244,7 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
     return canvas
 
 def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
-                   clear=False) -> None:
+                   clear=False, out_dir_name='plots/C1') -> None:
     """
     Plots the spikes of the layers in the given dictionary
 
@@ -265,10 +265,11 @@ def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
                                           yticks=True,
                                           xlabel='{}, {} scale layer'.format(\
                                                 layer.population.label, size)))
-        plt.Figure(*spike_panels).save('plots/C1_{}_{}_scale.png'.format(\
-                                                image_name, size))
+        plt.Figure(*spike_panels).save('{}/C1_{}_{}_scale.png'.format(\
+                                                out_dir_name, image_name, size))
 
-def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
+def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
+                   out_dir_name='plots/S2')\
         -> None:
     """
     Plots the S2 spikes
@@ -288,4 +289,5 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str)\
         spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
                                       xticks=True, yticks=True,
                                       xlabel='{} scale layer'.format(size)))
-        plt.Figure(*spike_panels).save('plots/S2_{}.png'.format(image_name))
+        plt.Figure(*spike_panels).save('{}/S2_{}.png'.format(\
+                                        out_dir_name, image_name))
