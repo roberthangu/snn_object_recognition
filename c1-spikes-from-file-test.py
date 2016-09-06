@@ -102,7 +102,7 @@ for i in range(args.s2_prototype_cells):
         reconstructions_dir_path.mkdir(parents=True)
 c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
 if not c1_plots_dir_path.exists():
-    c1_plots_dir_path.mkdir()
+    c1_plots_dir_path.mkdir(parents=True)
 s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
 for i in range(args.s2_prototype_cells):
     s2_plots_dir_path = s2_plots_dataset_dir / str(i)
