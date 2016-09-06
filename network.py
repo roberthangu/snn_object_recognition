@@ -576,15 +576,17 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     """
     f_s = 16
     weight_rng = rnd.RandomDistribution('normal', mu=.06, sigma=.003)
-    i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.35)
+    i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
+    i_offsets = list(map(lambda x: i_offset_rng.next(),
+                     range(args.s2_prototype_cells)))
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
-        i_offsets = list(map(lambda x: i_offset_rng.next(), range(n * m)))
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
-                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2),
+                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2,
+                                                     i_offset=i_offsets[i]),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=i), (n, m)),
                               range(args.s2_prototype_cells)))
@@ -596,7 +598,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         S2_layers[size] = layer_list
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = -1
+    inh_weight = -1.2
     print('Create S2 self inhibitory connections')
     for layer_list in S2_layers.values():
         for layer in layer_list:
