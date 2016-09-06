@@ -269,7 +269,7 @@ def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
                                                 out_dir_name, image_name, size))
 
 def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
-                   out_dir_name='plots/S2')\
+                   s2_prototype_cells: int, out_dir_name='plots/S2')\
         -> None:
     """
     Plots the S2 spikes
@@ -280,14 +280,16 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
         `image_name`: The name of the image that will be written. This string
                       will be a part of the actual plot file name.
     """
-    spike_panels = []
-    for size, layer in S2_layers.items():
-        out_data = layer.population.get_data().segments[0]
-        spike_panels.append(plt.Panel(out_data.spiketrains,
-                                      xticks=True, yticks=True,
-                                      xlabel='{} scale layer'.format(size)))
-        spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
-                                      xticks=True, yticks=True,
-                                      xlabel='{} scale layer'.format(size)))
-        plt.Figure(*spike_panels).save('{}/S2_{}.png'.format(\
-                                        out_dir_name, image_name))
+    for i in range(s2_prototype_cells):
+        spike_panels = []
+        for size, layer_list in S2_layers.items():
+            layer = layer_list[i]
+            out_data = layer.population.get_data().segments[0]
+            spike_panels.append(plt.Panel(out_data.spiketrains,
+                              xticks=True, yticks=True,
+              xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))
+            spike_panels.append(plt.Panel(out_data.filter(name='v')[0],
+                              xticks=True, yticks=True,
+              xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))
+        plt.Figure(*spike_panels).save('{}/{}/S2_{}_prototype{}.png'.format(\
+                                            out_dir_name, i, image_name, i))

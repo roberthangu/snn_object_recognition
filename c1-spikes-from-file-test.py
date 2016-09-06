@@ -57,6 +57,9 @@ for filepath in plb.Path('features_gabor').iterdir():
     feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
                                                   cv2.CV_8UC1)
 
+dataset_label = '{}_{}imgs_{}ms_scales_'.format(args.dataset_label,
+                                        args.image_count, int(args.sim_time))
+
 if is_root():
     print('Create C1 layers')
     t1 = time.clock()
@@ -64,6 +67,7 @@ dumpfile = open(args.c1_dumpfile, 'rb')
 ddict = pickle.load(dumpfile)
 layer_collection['C1'] = {}
 for size, layers_as_dicts in ddict.items():
+    dataset_label += '_{}'.format(str(size))
     layer_list = []
     for layer_as_dict in layers_as_dicts:
         n, m = layer_as_dict['shape']
@@ -91,8 +95,6 @@ for layer_list in layer_collection['S2'].values():
     for layer in layer_list:
         layer.population.record(['spikes', 'v'])
 
-dataset_label = '{}_{}imgs_{}ms'.format(args.dataset_label, args.image_count,
-                                        int(args.sim_time))
 reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
 for i in range(args.s2_prototype_cells):
     reconstructions_dir_path = reconstructions_dir_dataset_path / str(i)
