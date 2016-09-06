@@ -57,7 +57,7 @@ for filepath in plb.Path('features_gabor').iterdir():
     feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
                                                   cv2.CV_8UC1)
 
-dataset_label = '{}_{}imgs_{}ms_scales_'.format(args.dataset_label,
+dataset_label = '{}_{}imgs_{}ms_scales'.format(args.dataset_label,
                                         args.image_count, int(args.sim_time))
 
 if is_root():
