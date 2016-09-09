@@ -34,7 +34,7 @@ cropped_imgs = [(filename, crop_image(img, crop_shape))
                     for filename, img in imgs]
 
 resized_imgs = [(filename, cv2.resize(img, dsize=None, fx=300 / img.shape[0],
-                                    fy=300 / img.shape[0],
+                                    fy=384 / img.shape[0],
                                     interpolation=cv2.INTER_CUBIC))\
                     for filename, img in cropped_imgs]
 
