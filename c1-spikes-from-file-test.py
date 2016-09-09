@@ -95,19 +95,20 @@ for layer_list in layer_collection['S2'].values():
     for layer in layer_list:
         layer.population.record(['spikes', 'v'])
 
-reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
-for i in range(args.s2_prototype_cells):
-    reconstructions_dir_path = reconstructions_dir_dataset_path / str(i)
-    if not reconstructions_dir_path.exists():
-        reconstructions_dir_path.mkdir(parents=True)
-c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
-if not c1_plots_dir_path.exists():
-    c1_plots_dir_path.mkdir(parents=True)
-s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
-for i in range(args.s2_prototype_cells):
-    s2_plots_dir_path = s2_plots_dataset_dir / str(i)
-    if not s2_plots_dir_path.exists():
-        s2_plots_dir_path.mkdir(parents=True)
+if is_root():
+    reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
+    for i in range(args.s2_prototype_cells):
+        reconstructions_dir_path = reconstructions_dir_dataset_path / str(i)
+        if not reconstructions_dir_path.exists():
+            reconstructions_dir_path.mkdir(parents=True)
+    c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
+    if not c1_plots_dir_path.exists():
+        c1_plots_dir_path.mkdir(parents=True)
+    s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
+    for i in range(args.s2_prototype_cells):
+        s2_plots_dir_path = s2_plots_dataset_dir / str(i)
+        if not s2_plots_dir_path.exists():
+            s2_plots_dir_path.mkdir(parents=True)
 
 if is_root():
     print('========= Start simulation =========')
@@ -140,12 +141,11 @@ if is_root():
     end_time = time.clock()
     print('========= Stop  simulation =========')
     print('Simulation took', end_time - start_time, 's')
-
-# Reconstruct the last image
-for j in range(args.s2_prototype_cells):
-    cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
-                        (reconstructions_dir_dataset_path / str(j)).as_posix(),
-                        dataset_label, j, i + 1),
-            vis.reconstruct_S2_features(updated_weights[j], feature_imgs_dict))
+    # Reconstruct the last image
+    for j in range(args.s2_prototype_cells):
+        cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
+                            (reconstructions_dir_dataset_path / str(j)).as_posix(),
+                            dataset_label, j, i + 1),
+                vis.reconstruct_S2_features(updated_weights[j], feature_imgs_dict))
 
 sim.end()

@@ -574,7 +574,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size a list of different S2
         layers, for each prototype one.
     """
-    f_s = 16
+    f_s = 7
+    #f_s = 16
     weight_rng = rnd.RandomDistribution('normal', mu=.06, sigma=.003)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
