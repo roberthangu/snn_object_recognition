@@ -236,11 +236,13 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
     # Determine the highest intensity
     max_weight = max([max(layer_weights.ravel())\
                         for layer_weights in weights_dict.values()])
-    canvas = np.zeros( (97, 97) )
+    canvas = np.zeros( (43, 43) )
+    #canvas = np.zeros( (97, 97) )
     for label, weights in weights_dict.items():
         for i in range(len(weights)):
             copy_to_visualization(i, weights[i][0] / max_weight,
-                                  feature_imgs_dict[label], canvas, (16, 16), 6)
+                                  feature_imgs_dict[label], canvas, (7, 7), 6)
+                                  #feature_imgs_dict[label], canvas, (16, 16), 6)
     return canvas
 
 def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
