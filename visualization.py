@@ -221,7 +221,8 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
                         format(img_name_stem, size, feature_label), img)
 
 def reconstruct_S2_features(weights_dict: Dict[str, np.array],
-                            feature_imgs_dict: Dict[str, np.array]) -> np.array:
+                            feature_imgs_dict: Dict[str, np.array],
+                            f_s: int) -> np.array:
     """
     Reconstructs the weights of the S2 prototype neurons using the features
     passed feature images
@@ -232,17 +233,17 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
                         that feature
         `filtered_imgs_dict`: A dictionary containing for each feature name an
                               image of the feature
+        `f_s`: The size of the recognized features in C1 neurons
     """
     # Determine the highest intensity
     max_weight = max([max(layer_weights.ravel())\
                         for layer_weights in weights_dict.values()])
-    canvas = np.zeros( (43, 43) )
-    #canvas = np.zeros( (97, 97) )
+    side_length = f_s * 6 + 1
+    canvas = np.zeros( (side_length, side_length) )
     for label, weights in weights_dict.items():
         for i in range(len(weights)):
             copy_to_visualization(i, weights[i][0] / max_weight,
-                                  feature_imgs_dict[label], canvas, (7, 7), 6)
-                                  #feature_imgs_dict[label], canvas, (16, 16), 6)
+                                  feature_imgs_dict[label], canvas, (f_s, f_s), 6)
     return canvas
 
 def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,

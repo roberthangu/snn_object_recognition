@@ -7,6 +7,7 @@ import pathlib as plb
 import time
 import pickle
 import argparse as ap
+import signal
 
 import common as cm
 import network as nw
@@ -25,6 +26,8 @@ parser.add_argument('--c1-dumpfile', type=str, required=True,
 parser.add_argument('--dataset-label', type=str, required=True,
                     help='The name of the dataset which was used for\
                     training')
+parser.add_argument('--feature-size', type=int, default=3,
+                     help='The size of the features to be learnt')
 parser.add_argument('--s2-prototype-cells', type=int, default=3,
                     help='The number of S2 features to compute')
 parser.add_argument('--image-count', type=int, required=True,
@@ -127,6 +130,8 @@ if is_root():
         if not s2_plots_dir_path.exists():
             s2_plots_dir_path.mkdir(parents=True)
 
+out_dumpfile = open(args.weights_to, 'wb')
+
 if is_root():
     print('========= Start simulation =========')
     start_time = time.clock()
@@ -153,7 +158,8 @@ for i in range(args.image_count):
                         (reconstructions_dir_dataset_path / str(j)).as_posix(),
                          dataset_label, j, i + 1),
                     vis.reconstruct_S2_features(updated_weights[j],
-                                                feature_imgs_dict))
+                                                feature_imgs_dict,
+                                                args.feature_size))
 if is_root():
     end_time = time.clock()
     print('========= Stop  simulation =========')
@@ -164,5 +170,7 @@ if is_root():
                             (reconstructions_dir_dataset_path / str(j)).as_posix(),
                             dataset_label, j, i + 1),
                 vis.reconstruct_S2_features(updated_weights[j], feature_imgs_dict))
+    print('Dumping trained weights to file', args.weights_to)
+    pickle.dump(updated_weights, out_dumpfile)
 
 sim.end()
