@@ -574,9 +574,9 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         A dictionary containing for each size a list of different S2
         layers, for each prototype one.
     """
-    f_s = 7
-    #f_s = 16
-    weight_rng = rnd.RandomDistribution('normal', mu=.06, sigma=.003)
+    f_s = args.feature_size
+    initial_weight = 15.36 / (f_s * f_s)
+    weight_rng = rnd.RandomDistribution('normal', mu=initial_weight, sigma=.003)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
@@ -627,6 +627,38 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                                    sim.StaticSynapse(weight=inh_weight))
     return S2_layers
 
+def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
+                   active_layer=None, first_neuron=0,
+                   weights_dict=None) -> None:
+    """
+    Set the weights of a prototype S2 layer either to the weights of a specific
+    neuron in the given layer or to a given dict of weights
+
+    Parameters:
+        `S2_layers`: A dictionary containing for each size the corresponding S2
+                     layer
+
+        `prototype`: The prototype index for which to copy the weights
+
+        `active_layer`: The layer in which the neuron first_neuron contains the
+                        weights to be copied to the S2_layers
+
+        `first_neuron`: The neuron in active_layer from which to copy the
+                        weights to the S2_layers
+                        
+        `weights_dict`: A dictionary containing for each feature label a
+                        weights array to be copied to the S2_layers
+    """
+    for layer_list in S2_layers.values():
+        current_layer = layer_list[prototype]
+        for label, projections in current_layer.projections.items():
+            for proj in projections:
+                if weights_dict == None:
+                    proj.set(weight=active_layer.projections[label][first_neuron]\
+                                                        .get('weight', 'array'))
+                else:
+                    proj.set(weight=weights_dict[prototype][label])
+
 def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
                           s2_prototype_cells: int)\
         -> List[Dict[str, np.array]]:
@@ -636,11 +668,12 @@ def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
     Parameters:
         `S2_layers`: A dictionary containing for each size the corresponding S2
                      layer
+
         `s2_prototype_cells`: The number of S2 prototype cells
 
     Returns:
         A list containing for each prototype the weights of the connections of
-        the neuron which fired first of the respective prototype.
+        the neuron which fired first in the respective prototype.
     """
     weights_dict_list = []
     for i in range(s2_prototype_cells):
@@ -659,26 +692,19 @@ def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
                     earliest_spike = current_spiketrains[j][0]
                     first_neuron = j
                     active_layer = current_layer
-#       for label, projections in active_layer.projections.items():
-#           print(projections[first_neuron].get('weight', 'array'))
 
         # Copy the weights of the neuron in the active layer to all other S2 layers
         if earliest_spike < np.infty:
-            for layer_list in S2_layers.values():
-                current_layer = layer_list[i]
-                for label, projections in current_layer.projections.items():
-                    for proj in projections:
-                        proj.set(weight=active_layer.projections[label][first_neuron]\
-                                                            .get('weight', 'array'))
+            set_s2_weights(S2_layers, active_layer=active_layer,
+                           first_neuron=first_neuron, prototype=i)
+            weights_dict_list.append(\
+                dict([(label, projections[first_neuron].get('weight', 'array'))\
+                    for label, projections in active_layer.projections.items()]))
         # If no earliest spike was found, for e.g. if no neuron fired, take the
         # weights of any neuron from the population, e.g. the first one.
-        if earliest_spike == np.infty:
+        else:
             weights_dict_list.append(\
                 dict([(label, projections[first_neuron].get('weight', 'array'))\
                 for label, projections in\
                     list(S2_layers.values())[0][i].projections.items()]))
-        else:
-            weights_dict_list.append(\
-                dict([(label, projections[first_neuron].get('weight', 'array'))\
-                    for label, projections in active_layer.projections.items()]))
     return weights_dict_list
