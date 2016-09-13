@@ -40,7 +40,23 @@ parser.add_argument('--refrac-s2', type=float, default=.1, metavar='.1',
 parser.add_argument('--sim-time', default=50, type=float, metavar='50',
                      help='Simulation time')
 parser.add_argument('--threads', default=1, type=int)
+parser.add_argument('--weights-from', type=str,
+                    help='File containing the initial weights and initial image')
+parser.add_argument('--weights-to', type=str, required=True,
+                    help='File to dump the weights to')
 args = parser.parse_args()
+
+def handler(signum, frame):
+    print('Caught signal', signum)
+    print('Dumping the weights to file')
+    pickle.dump((updated_weights, i), out_dumpfile)
+    sys.exit(2)
+
+signal.signal(signal.SIGFPE, handler)
+signal.signal(signal.SIGABRT, handler)
+signal.signal(signal.SIGBUS, handler)
+signal.signal(signal.SIGILL, handler)
+signal.signal(signal.SIGSEGV, handler)
 
 MPI_ROOT = 0
 
@@ -57,8 +73,9 @@ for filepath in plb.Path('features_gabor').iterdir():
     feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
                                                   cv2.CV_8UC1)
 
-dataset_label = '{}_{}imgs_{}ms_scales'.format(args.dataset_label,
-                                        args.image_count, int(args.sim_time))
+dataset_label = '{}_fs{}_{}imgs_{}ms_scales'.format(args.dataset_label,
+                                        args.feature_size, args.image_count,
+                                        int(args.sim_time))
 
 if is_root():
     print('Create C1 layers')
