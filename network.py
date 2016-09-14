@@ -122,7 +122,7 @@ def recognizer_weights_from(feature_np_array):
     return proj.get('weight', 'array')
 
 def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
-                   k_out, stdp=False):
+                   k_out, stdp=False, initial_weight=0):
     """
     Connects a neuron of an output layer to the corresponding square of an input
     layer. This is a helper function of connect_layer_to_layer()
@@ -141,10 +141,12 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
         i += 1
 
     if stdp:
+        A_plus = initial_weight / 24
+        A_minus = initial_weight / 48
         td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                               A_plus=0.0025, A_minus=0.00125)
-        #wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.6)
-        wd = sim.MultiplicativeWeightDependence(w_min=0, w_max=0.6)
+                               A_plus=A_plus, A_minus=A_minus)
+        wd = sim.AdditiveWeightDependence(w_min=0, w_max=0.6)
+        #wd = sim.MultiplicativeWeightDependence(w_min=0, w_max=0.6)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(),
@@ -186,7 +188,8 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     return (n, m)
 
 def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
-                           weights, stdp=False, delay=None) -> List[sim.Projection]:
+                           weights, stdp=False, delay=None, initial_weight=0)\
+        -> List[sim.Projection]:
     """
     Connects a full input layer to a full output layer by connecting each
     neuron of the output layer to a square of neurons in the input layer
@@ -222,13 +225,15 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
         while j + f_m <= t_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, i, j, i + f_n, j + f_m,
-                                              k_out, stdp))
+                                              k_out, stdp=stdp,
+                                              initial_weight=initial_weight))
             k_out += 1
             j += delta
         if overfull_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, i, t_m - f_m, i + f_n,
-                                              t_m, k_out, stdp))
+                                              t_m, k_out, stdp=stdp,
+                                              initial_weight=initial_weight))
             k_out += 1
         i += delta
     if overfull_n:
@@ -236,13 +241,15 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
         while j + f_m <= t_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, t_n - f_n, j, t_n,
-                                              j + f_m, k_out, stdp))
+                                              j + f_m, k_out, stdp=stdp,
+                                              initial_weight=initial_weight))
             k_out += 1
             j += delta
         if overfull_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, t_n - f_n, t_m - f_m,
-                                              t_n, t_m, k_out, stdp))
+                                              t_n, t_m, k_out, stdp=stdp,
+                                              initial_weight=initial_weight))
             k_out += 1
     return projections
     
@@ -596,7 +603,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
             for C1_layer in layers:
                 S2_layer.projections[C1_layer.population.label] =\
                     connect_layer_to_layer(C1_layer, S2_layer, (f_s, f_s), f_s,
-                                           weights, stdp=True)
+                                           weights, stdp=True,
+                                           initial_weight=initial_weight)
         S2_layers[size] = layer_list
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
