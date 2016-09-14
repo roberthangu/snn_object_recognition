@@ -106,11 +106,11 @@ def get_gabor_edges(target_img) -> Dict[str, np.array]:
     angles = [np.pi / 8, np.pi / 4 + np.pi / 8, np.pi / 2 +  np.pi / 8,
               3 * np.pi / 4 + np.pi / 8]
     feature_names = get_gabor_feature_names()
-    gabor_kernel = cv2.getGaborKernel((5, 5), 1.4, angle, 5, 1)
     blurred_img = cv2.GaussianBlur(target_img, (5, 5), 5)
     return dict([(name,
                   cv2.convertScaleAbs(\
-                    cv2.filter2D(blurred_img, cv2.CV_64F, gabor_kernel)))\
+                    cv2.filter2D(blurred_img, cv2.CV_64F,
+                                cv2.getGaborKernel((5, 5), 1.4, angle, 5, 1))))\
                   for name, angle in zip(feature_names, angles)])
 
 def read_and_prepare_img(target_name, filter_type):
