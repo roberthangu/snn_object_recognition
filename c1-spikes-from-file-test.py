@@ -169,7 +169,9 @@ if is_root():
         cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
                             (reconstructions_dir_dataset_path / str(j)).as_posix(),
                             dataset_label, j, i + 1),
-                vis.reconstruct_S2_features(updated_weights[j], feature_imgs_dict))
+                vis.reconstruct_S2_features(updated_weights[j],
+                                            feature_imgs_dict,
+                                            args.feature_size))
     print('Dumping trained weights to file', args.weights_to)
     pickle.dump(updated_weights, out_dumpfile)
 
