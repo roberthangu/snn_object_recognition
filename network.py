@@ -147,7 +147,7 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
         td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
                                A_plus=A_plus, A_minus=A_minus)
         wd = sim.AdditiveWeightDependence(w_min=0, w_max=w_max)
-        #wd = sim.MultiplicativeWeightDependence(w_min=0, w_max=0.6)
+        #wd = sim.MultiplicativeWeightDependence(w_min=0, w_max=w_max)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(),
@@ -585,7 +585,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     """
     f_s = args.feature_size
     initial_weight = 15.36 / (f_s * f_s)
-    weight_rng = rnd.RandomDistribution('normal', mu=initial_weight, sigma=.003)
+    weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
+                                                  sigma=initial_weight / 20)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
     weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
     S2_layers = {}
@@ -595,8 +596,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
-                                     sim.IF_curr_exp(tau_refrac=args.refrac_s2,
-                                                     i_offset=i_offsets[i]),
+                                     sim.IF_curr_exp(i_offset=i_offsets[i]),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=i), (n, m)),
                               range(args.s2_prototype_cells)))
