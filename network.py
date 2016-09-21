@@ -596,7 +596,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
-                                     sim.IF_curr_exp(i_offset=i_offsets[i]),
+                                     sim.IF_curr_exp(i_offset=i_offsets[i],
+                                                     tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=i), (n, m)),
                               range(args.s2_prototype_cells)))
