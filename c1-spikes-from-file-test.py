@@ -28,8 +28,6 @@ parser.add_argument('--dataset-label', type=str, required=True,
                     training')
 parser.add_argument('--feature-size', type=int, default=3,
                      help='The size of the features to be learnt')
-parser.add_argument('--refrac-s2', type=float, default=.1, metavar='MS',
-                    help='The refractory period of neurons in the S2 layer in ms')
 parser.add_argument('--s2-prototype-cells', type=int, default=3,
                     help='The number of S2 features to compute')
 parser.add_argument('--image-count', type=int, required=True,
