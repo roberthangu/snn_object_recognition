@@ -1,6 +1,7 @@
 from typing import Dict, Sequence, List
 import numpy as np
 import pyNN.nest as sim
+import nest
 import pyNN.space as space
 import pyNN.random as rnd
 import argparse as ap
@@ -141,19 +142,20 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
         i += 1
 
     if stdp:
-        A_plus = initial_weight / 24
-        A_minus = initial_weight / 48
         w_max = initial_weight * 10
-        td = sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                               A_plus=A_plus, A_minus=A_minus)
-        wd = sim.AdditiveWeightDependence(w_min=0, w_max=w_max)
-        #wd = sim.MultiplicativeWeightDependence(w_min=0, w_max=w_max)
+        stdp_shared = sim.native_synapse_type('stdp_synapse_shared')\
+                       (Wmax=w_max * 1000, mu_plus=0.0, mu_minus=1.0, label=str)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
-                              sim.AllToAllConnector(),
-                              sim.STDPMechanism(timing_dependence=td,
-                                                weight_dependence=wd,
-                                                weight=weights))
+                              sim.AllToAllConnector(), stdp_shared)
+        for i in range(len(view_elements)):
+            conn = nest.GetConnections(\
+                            source=[input_layer.population[view_elements[i]]],
+                            target=[output_layer.population[k_out]])
+            nest.SetStatus(conn, {'label': '{}_{}_{}'.format(\
+                                    output_layer.population.label,
+                                    input_layer.population.label, i),
+                                  'weight': weights[i][0] * 1000})
     else:
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
@@ -610,7 +612,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         S2_layers[size] = layer_list
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = -1.2
+    inh_weight = -2
     print('Create S2 self inhibitory connections')
     for layer_list in S2_layers.values():
         for layer in layer_list:
@@ -671,8 +673,7 @@ def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
                     proj.set(weight=weights_dict[prototype][label])
 
 def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
-                          s2_prototype_cells: int)\
-        -> List[Dict[str, np.array]]:
+                          s2_prototype_cells: int) -> List[Dict[str, np.array]]:
     """
     Updates the weights of the "shared" projections of the S2 neurons.
 
@@ -718,4 +719,27 @@ def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
                 dict([(label, projections[first_neuron].get('weight', 'array'))\
                 for label, projections in\
                     list(S2_layers.values())[0][i].projections.items()]))
+    return weights_dict_list
+
+def get_current_weights(S2_layers: Dict[float, Sequence[Layer]],
+                        s2_prototype_cells: int) -> List[Dict[str, np.array]]:
+    """
+    Gets the weights of the "shared" projections of the S2 neurons.
+
+    Parameters:
+        `S2_layers`: A dictionary containing for each size the corresponding S2
+                     layer
+
+        `s2_prototype_cells`: The number of S2 prototype cells
+
+    Returns:
+        A list containing for each prototype the weights of the connections of
+        the neuron which fired first in the respective prototype.
+    """
+    weights_dict_list = []
+    for i in range(s2_prototype_cells):
+        weights_dict_list.append(\
+            dict([(label, projections[0].get('weight', 'array'))\
+            for label, projections in\
+                list(S2_layers.values())[0][i].projections.items()]))
     return weights_dict_list

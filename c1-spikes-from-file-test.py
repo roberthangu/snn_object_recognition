@@ -52,7 +52,7 @@ args = parser.parse_args()
 def handler(signum, frame):
     print('Caught signal', signum)
     print('Dumping the weights to file')
-    pickle.dump((updated_weights, i), out_dumpfile)
+    pickle.dump((current_weights, i), out_dumpfile)
     sys.exit(2)
 
 signal.signal(signal.SIGFPE, handler)
@@ -149,15 +149,15 @@ for i in range(args.image_count):
                            '{}_image_{}'.format(dataset_label, i),
                            args.s2_prototype_cells,
                            out_dir_name=s2_plots_dataset_dir.as_posix())
-    updated_weights = nw.update_shared_weights(layer_collection['S2'],
-                                               args.s2_prototype_cells)
     if is_root():
         if (i + 1) % 10 == 0:
+            current_weights = nw.get_current_weights(layer_collection['S2'],
+                                                     args.s2_prototype_cells)
             for j in range(args.s2_prototype_cells):
                 cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
                         (reconstructions_dir_dataset_path / str(j)).as_posix(),
                          dataset_label, j, i + 1),
-                    vis.reconstruct_S2_features(updated_weights[j],
+                    vis.reconstruct_S2_features(current_weights[j],
                                                 feature_imgs_dict,
                                                 args.feature_size))
 if is_root():
@@ -169,10 +169,10 @@ if is_root():
         cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
                             (reconstructions_dir_dataset_path / str(j)).as_posix(),
                             dataset_label, j, i + 1),
-                vis.reconstruct_S2_features(updated_weights[j],
+                vis.reconstruct_S2_features(current_weights[j],
                                             feature_imgs_dict,
                                             args.feature_size))
     print('Dumping trained weights to file', args.weights_to)
-    pickle.dump(updated_weights, out_dumpfile)
+    pickle.dump(current_weights, out_dumpfile)
 
 sim.end()
