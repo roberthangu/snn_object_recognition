@@ -601,7 +601,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                                      sim.IF_curr_exp(i_offset=i_offsets[i],
                                                      tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
-                                     label=i), (n, m)),
+                                     label=str(i)), (n, m)),
                               range(args.s2_prototype_cells)))
         for S2_layer in layer_list:
             for C1_layer in layers:
