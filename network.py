@@ -1,4 +1,4 @@
-from typing import Dict, Sequence, List
+from typing import Dict, Sequence, List, Tuple
 import numpy as np
 import pyNN.nest as sim
 import nest
@@ -123,7 +123,7 @@ def recognizer_weights_from(feature_np_array):
     return proj.get('weight', 'array')
 
 def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
-                   k_out, stdp=False, initial_weight=0):
+                   k_out, stdp=False, initial_weight=0, label_dict=None):
     """
     Connects a neuron of an output layer to the corresponding square of an input
     layer. This is a helper function of connect_layer_to_layer()
@@ -149,13 +149,10 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(), stdp_shared)
         for i in range(len(view_elements)):
-            conn = nest.GetConnections(\
-                            source=[input_layer.population[view_elements[i]]],
-                            target=[output_layer.population[k_out]])
-            nest.SetStatus(conn, {'label': '{}_{}_{}'.format(\
-                                    output_layer.population.label,
-                                    input_layer.population.label, i),
-                                  'weight': weights[i][0] * 1000})
+            label = '{}_{}_{}'.format(output_layer.population.label,
+                                      input_layer.population.label, i)
+            label_dict[label][0].append(input_layer.population[view_elements[i]])
+            label_dict[label][1].append(output_layer.population[k_out])
     else:
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
@@ -191,7 +188,8 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     return (n, m)
 
 def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
-                           weights, stdp=False, delay=None, initial_weight=0)\
+                           weights, stdp=False, delay=None, initial_weight=0,
+                           label_dict=None)\
         -> List[sim.Projection]:
     """
     Connects a full input layer to a full output layer by connecting each
@@ -229,14 +227,16 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, i, j, i + f_n, j + f_m,
                                               k_out, stdp=stdp,
-                                              initial_weight=initial_weight))
+                                              initial_weight=initial_weight,
+                                              label_dict=label_dict))
             k_out += 1
             j += delta
         if overfull_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, i, t_m - f_m, i + f_n,
                                               t_m, k_out, stdp=stdp,
-                                              initial_weight=initial_weight))
+                                              initial_weight=initial_weight,
+                                              label_dict=label_dict))
             k_out += 1
         i += delta
     if overfull_n:
@@ -245,14 +245,16 @@ def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, t_n - f_n, j, t_n,
                                               j + f_m, k_out, stdp=stdp,
-                                              initial_weight=initial_weight))
+                                              initial_weight=initial_weight,
+                                              label_dict=label_dict))
             k_out += 1
             j += delta
         if overfull_m:
             projections.append(connect_layers(input_layer, output_layer,
                                               weights, t_n - f_n, t_m - f_m,
                                               t_n, t_m, k_out, stdp=stdp,
-                                              initial_weight=initial_weight))
+                                              initial_weight=initial_weight,
+                                              label_dict=label_dict))
             k_out += 1
     return projections
     
@@ -570,6 +572,28 @@ def create_local_inhibition(layers_dict):
                 sim.StaticSynapse(weight='.25 * d - 1.75'),
                 space=space.Space(axes='xy')) 
 
+def initialize_label_dict(s2_prototype_cells: int, f_s: int)\
+        -> Dict[str, Tuple[List[int], List[int]]]:
+    """
+    Initializes the label dict with the corresponding labels as keys
+
+    Parameters:
+        `s2_prototype_cells`: The number of S2 prototype cells
+
+        `f_s`: The feature size in C1 neurons
+
+    Returns:
+        A dictionary containing the labels as keys mapping to pairs of empty
+        lists
+    """
+    label_dict = {}
+    neurons = f_s * f_s
+    for prototype in range(s2_prototype_cells):
+        for label in cm.get_gabor_feature_names():
+            for i in range(neurons):
+                label_dict['{}_{}_{}'.format(prototype, label, i)] = ([], [])
+    return label_dict
+
 def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace)\
         -> Dict[float, List[Layer]]:
     """
@@ -587,13 +611,14 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     """
     f_s = args.feature_size
     initial_weight = 15.36 / (f_s * f_s)
-    weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
-                                                  sigma=initial_weight / 20)
+#    weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
+#                                                  sigma=initial_weight / 20)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
-    weights = list(map(lambda x: [weight_rng.next()], range(f_s * f_s)))
+#    weights = list(map(lambda x: [weight_rng.next()], range(4 * f_s * f_s)))
     S2_layers = {}
     i_offsets = list(map(lambda x: i_offset_rng.next(),
                      range(args.s2_prototype_cells)))
+    label_dict = initialize_label_dict(args.s2_prototype_cells, f_s)
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         print('S2 Shape', n, m)
@@ -601,15 +626,23 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                                      sim.IF_curr_exp(i_offset=i_offsets[i],
                                                      tau_refrac=args.refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
-                                     label=i), (n, m)),
+                                     label=str(i)), (n, m)),
                               range(args.s2_prototype_cells)))
         for S2_layer in layer_list:
             for C1_layer in layers:
                 S2_layer.projections[C1_layer.population.label] =\
                     connect_layer_to_layer(C1_layer, S2_layer, (f_s, f_s), f_s,
-                                           weights, stdp=True,
-                                           initial_weight=initial_weight)
+                                           [], stdp=True,
+                                           initial_weight=initial_weight,
+                                           label_dict=label_dict)
         S2_layers[size] = layer_list
+    # Set the labels of the shared connections
+    t = time.clock()
+    for label, (source, target) in label_dict.items():
+        conns = nest.GetConnections(source=source, target=target)
+        nest.SetStatus(conns, {'label': label,
+                              'weight': initial_weight})
+    print('Setting labels took', time.clock() - t)
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
     inh_weight = -2
