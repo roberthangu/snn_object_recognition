@@ -9,7 +9,6 @@ import cv2
 import pathlib as plb
 import time
 import common as cm
-import sys
 try:
     import stream
 except ImportError:
@@ -618,7 +617,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
                                                   sigma=initial_weight / 20)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
-    weights = list(map(lambda x: weight_rng.next(), range(4 * f_s * f_s)))
+    weights = list(map(lambda x: weight_rng.next() * 1000, range(4 * f_s * f_s)))
     S2_layers = {}
     i_offsets = list(map(lambda x: i_offset_rng.next(),
                      range(args.s2_prototype_cells)))
@@ -645,24 +644,11 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     print('Set shared labels')
     for i in range(len(s2_label_dicts)):
         w_iter = weights.__iter__()
-#        print('Number of labels in prototype', i, 'is', len(s2_label_dicts[i]))
         for label, (source, target) in s2_label_dicts[i].items():
-#            print('source has size', len(source), 'and target', len(target))
-            weight = w_iter.__next__()
-#            print('Setting label', label, 'to weight', weight)
             conns = nest.GetConnections(source=source, target=target)
             nest.SetStatus(conns, {'label': label,
-                                  'weight': weight})
-    for prototype in range(args.s2_prototype_cells):
-        print('============= Prototype', prototype, '=============')
-        for size, layer_list in S2_layers.items():
-            print('===== Size', size, '========')
-            for nid in layer_list[prototype].population.all_cells:
-                conns = nest.GetConnections(target=[nid])
-                print('prototype', prototype, 'weights')
-                print(nest.GetStatus(conns, ['source', 'target', 'weight', 'label']))
+                                  'weight': w_iter.next()})
     print('Setting labels took', time.clock() - t)
-    sys.exit(0)
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
     inh_weight = -2
