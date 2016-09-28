@@ -66,7 +66,7 @@ MPI_ROOT = 0
 def is_root():
     return MPI.COMM_WORLD.rank == MPI_ROOT 
 
-sim.setup(threads=args.threads)
+sim.setup(threads=args.threads, min_delay=.1)
 
 layer_collection = {}
 

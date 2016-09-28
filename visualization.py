@@ -287,7 +287,7 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
         spike_panels = []
         for size, layer_list in S2_layers.items():
             layer = layer_list[i]
-            out_data = layer.population.get_data().segments[0]
+            out_data = layer.population.get_data(clear=True).segments[0]
             spike_panels.append(plt.Panel(out_data.spiketrains,
                               xticks=True, yticks=True,
               xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))

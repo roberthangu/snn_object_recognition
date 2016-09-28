@@ -634,7 +634,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     initial_weight = 15.36 / (f_s * f_s)
     weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
                                                   sigma=initial_weight / 20)
-    i_offset_rng = rnd.RandomDistribution('normal', mu=.4, sigma=.3)
+    i_offset_rng = rnd.RandomDistribution('normal', mu=.5, sigma=.45)
     weights = list(map(lambda x: weight_rng.next() * 1000, range(4 * f_s * f_s)))
     S2_layers = {}
     i_offsets = list(map(lambda x: i_offset_rng.next(),
@@ -645,7 +645,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         l_i_offsets = [list(map(lambda x: rnd.RandomDistribution('normal',
-                         mu=i_offsets[i], sigma=.1).next(), range(n * m)))\
+                         mu=i_offsets[i], sigma=.25).next(), range(n * m)))\
                             for i in range(args.s2_prototype_cells)]
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
@@ -677,12 +677,14 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
     inh_weight = -2
+    inh_delay = .1
     print('Create S2 self inhibitory connections')
     for layer_list in S2_layers.values():
         for layer in layer_list:
             sim.Projection(layer.population, layer.population,
                            sim.AllToAllConnector(allow_self_connections=False),
-                           sim.StaticSynapse(weight=inh_weight))
+                           sim.StaticSynapse(weight=inh_weight,
+                                             delay=inh_delay))
     # ...and between the layers
     print('Create S2 cross-scale inhibitory connections')
     for i in range(args.s2_prototype_cells):
@@ -692,7 +694,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                     sim.Projection(layer_list1[i].population,
                                    layer_list2[i].population,
                                    sim.AllToAllConnector(),
-                                   sim.StaticSynapse(weight=inh_weight))
+                                   sim.StaticSynapse(weight=inh_weight,
+                                                     delay=inh_delay))
     # Create the inhibition between different prototype layers
     print('Create S2 cross-prototype inhibitory connections')
     for layer_list in S2_layers.values():
@@ -701,7 +704,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
                 if layer1 != layer2:
                     sim.Projection(layer1.population, layer2.population,
                                    sim.OneToOneConnector(),
-                                   sim.StaticSynapse(weight=inh_weight))
+                                   sim.StaticSynapse(weight=inh_weight-1,
+                                                     delay=inh_delay))
     return S2_layers
 
 def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
