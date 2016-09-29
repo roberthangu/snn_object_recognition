@@ -117,10 +117,8 @@ for layer_list in layer_collection['S2'].values():
 
 if is_root():
     reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
-    for i in range(args.s2_prototype_cells):
-        reconstructions_dir_path = reconstructions_dir_dataset_path / str(i)
-        if not reconstructions_dir_path.exists():
-            reconstructions_dir_path.mkdir(parents=True)
+    if not reconstructions_dir_dataset_path.exists():
+        reconstructions_dir_dataset_path.mkdir(parents=True)
     c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
     if not c1_plots_dir_path.exists():
         c1_plots_dir_path.mkdir(parents=True)
@@ -153,25 +151,23 @@ for i in range(args.image_count):
         if (i + 1) % 10 == 0:
             current_weights = nw.get_current_weights(layer_collection['S2'],
                                                      args.s2_prototype_cells)
-            for j in range(args.s2_prototype_cells):
-                cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
-                        (reconstructions_dir_dataset_path / str(j)).as_posix(),
-                         dataset_label, j, i + 1),
-                    vis.reconstruct_S2_features(current_weights[j],
-                                                feature_imgs_dict,
-                                                args.feature_size))
+            cv2.imwrite('{}/{}_{}_images.png'.format(\
+                     reconstructions_dir_dataset_path.as_posix(),
+                     dataset_label, i + 1),
+                vis.reconstruct_S2_features(current_weights,
+                                            feature_imgs_dict,
+                                            args.feature_size))
 if is_root():
     end_time = time.clock()
     print('========= Stop  simulation =========')
     print('Simulation took', end_time - start_time, 's')
     # Reconstruct the last image
-    for j in range(args.s2_prototype_cells):
-        cv2.imwrite('{}/{}_prototype{}_{}_images.png'.format(\
-                            (reconstructions_dir_dataset_path / str(j)).as_posix(),
-                            dataset_label, j, i + 1),
-                vis.reconstruct_S2_features(current_weights[j],
-                                            feature_imgs_dict,
-                                            args.feature_size))
+    cv2.imwrite('{}/{}_{}_images.png'.format(\
+             reconstructions_dir_dataset_path.as_posix(),
+             dataset_label, i + 1),
+        vis.reconstruct_S2_features(current_weights,
+                                    feature_imgs_dict,
+                                    args.feature_size))
     print('Dumping trained weights to file', args.weights_to)
     pickle.dump(current_weights, out_dumpfile)
 
