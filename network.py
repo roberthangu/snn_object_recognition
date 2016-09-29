@@ -203,7 +203,7 @@ def how_many_squares_in_shape(input_shape, feature_shape, delta):
     return (n, m)
 
 def connect_layer_to_layer(input_layer, output_layer, feature_shape, delta,
-                           weights, stdp=False, delay=None, initial_weight=0,
+                           weights, stdp=False, initial_weight=0,
                            ndicts=None, ondicts=None, omdicts=None)\
         -> List[sim.Projection]:
     """
