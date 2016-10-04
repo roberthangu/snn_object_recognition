@@ -6,7 +6,7 @@ import network as nw
 import cv2
 
 def copy_to_visualization(pos, ratio, feature_img, visualization_img,
-                          layer_shape, delta):
+                          layer_shape, delta, overfull=True):
     """
     Copies a feature image onto the visualization canvas at the given position
     of the neuron layer with the given intensity.
@@ -33,9 +33,9 @@ def copy_to_visualization(pos, ratio, feature_img, visualization_img,
     p_j = pos % m
     start_i = delta * p_i
     start_j = delta * p_j
-    if p_i == n - 1:
+    if overfull and p_i == n - 1:
         start_i = t_n - f_n
-    if p_j == m - 1:
+    if overfull and p_j == m - 1:
         start_j = t_m - f_m
     rationated_feature_img = ratio * feature_img
     for i in range(f_n):
@@ -220,7 +220,7 @@ def reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
             cv2.imwrite(output_dir.as_posix() + '/{}_{}_C1_{}_reconstruction.png'.\
                         format(img_name_stem, size, feature_label), img)
 
-def reconstruct_S2_features(weights_dict: Dict[str, np.array],
+def reconstruct_S2_features(weights_dicts: Sequence[Dict[str, np.array]],
                             feature_imgs_dict: Dict[str, np.array],
                             f_s: int) -> np.array:
     """
@@ -228,23 +228,39 @@ def reconstruct_S2_features(weights_dict: Dict[str, np.array],
     passed feature images
 
     Parameters:
-        `weights_dict`: A dictionary containing for each feature name the
-                        connection weights from the S2 layer to the C1 layer of
-                        that feature
+        `weights_dicts`: A list of dictionaries containing for each prototype a
+                         the feature name and the connection weights from the S2
+                         layer to the C1 layer of that feature
+
         `filtered_imgs_dict`: A dictionary containing for each feature name an
                               image of the feature
+
         `f_s`: The size of the recognized features in C1 neurons
     """
-    # Determine the highest intensity
-    max_weight = max([max(layer_weights.ravel())\
-                        for layer_weights in weights_dict.values()])
-    side_length = f_s * 6 + 1
-    canvas = np.zeros( (side_length, side_length) )
-    for label, weights in weights_dict.items():
-        for i in range(len(weights)):
-            copy_to_visualization(i, weights[i][0] / max_weight,
-                                  feature_imgs_dict[label], canvas, (f_s, f_s), 6)
-    return canvas
+    # Determine the dimensions of the output canvas
+    s2_prototype_cells = len(weights_dicts)
+    n = int(np.sqrt(s2_prototype_cells))
+    while n > 1 and s2_prototype_cells % n != 0:
+        n -= 1
+    m = s2_prototype_cells // n
+    f_side_length = f_s * 6 + 1
+    t_side_length = f_side_length + 3
+    big_canvas = np.zeros( (n * t_side_length, m * t_side_length) )
+    # Draw the prototype reconstructions
+    for prototype in range(s2_prototype_cells):
+        # Determine the highest intensity
+        weights_dict = weights_dicts[prototype]
+        max_weight = max([max(layer_weights.ravel())\
+                            for layer_weights in weights_dict.values()])
+        canvas = np.zeros( (f_side_length, f_side_length) )
+        for label, weights in weights_dict.items():
+            for i in range(len(weights)):
+                copy_to_visualization(i, weights[i][0] / max_weight,
+                                      feature_imgs_dict[label], canvas,
+                                      (f_s, f_s), 6)
+        copy_to_visualization(prototype, 1, canvas, big_canvas, (n, m),
+                              t_side_length, overfull=False)
+    return big_canvas
 
 def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
                    clear=False, out_dir_name='plots/C1') -> None:
@@ -287,7 +303,7 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
         spike_panels = []
         for size, layer_list in S2_layers.items():
             layer = layer_list[i]
-            out_data = layer.population.get_data().segments[0]
+            out_data = layer.population.get_data(clear=True).segments[0]
             spike_panels.append(plt.Panel(out_data.spiketrains,
                               xticks=True, yticks=True,
               xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))
