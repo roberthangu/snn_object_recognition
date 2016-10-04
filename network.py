@@ -10,7 +10,6 @@ import pathlib as plb
 import time
 import common as cm
 import sys
-from collections import OrderedDict
 try:
     import stream
 except ImportError:
@@ -608,7 +607,7 @@ def initialize_label_dicts(s2_prototype_cells: int, f_s: int)\
     s2_label_dicts = [None] * s2_prototype_cells
     neurons = f_s * f_s
     for prototype in range(s2_prototype_cells):
-        s2_label_dicts[prototype] = OrderedDict()
+        s2_label_dicts[prototype] = []
         for label in cm.get_gabor_feature_names():
             for i in range(neurons):
                 s2_label_dicts[prototype]['{}_{}_{}'\
