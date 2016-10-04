@@ -140,6 +140,9 @@ cv2.imwrite('{}/{}_{}_images.png'.format(\
     vis.reconstruct_S2_features(current_weights,
                                 feature_imgs_dict,
                                 args.feature_size))
+# Also add the weights of the last iteration to the dumpfile
+if args.image_count % args.epoch != 0:
+    epoch_weights.append((args.image_count, current_weights))
 print('Dumping weights for the selected epochs to file', dumpfile_name)
 pickle.dump(epoch_weights, out_dumpfile, protocol=4)
 out_dumpfile.close()
