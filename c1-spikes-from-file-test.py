@@ -14,12 +14,6 @@ import network as nw
 import visualization as vis
 import time
 
-try:
-    from mpi4py import MPI
-except ImportError:
-    raise Exception("Trying to gather data without MPI installed. If you are\
-    not running a distributed simulation, this is a bug in PyNN.")
-
 parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
 parser.add_argument('--c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains')
@@ -45,23 +39,7 @@ parser.add_argument('--refrac-s2', type=float, default=.1, metavar='.1',
 parser.add_argument('--sim-time', default=50, type=float, metavar='50',
                      help='Simulation time')
 parser.add_argument('--threads', default=1, type=int)
-parser.add_argument('--weights-from', type=str,
-                    help='File containing the initial weights and initial image')
-parser.add_argument('--weights-to', type=str, required=True,
-                    help='File to dump the weights to')
 args = parser.parse_args()
-
-def handler(signum, frame):
-    print('Caught signal', signum)
-    print('Dumping the weights to file')
-    pickle.dump((current_weights, i), out_dumpfile)
-    sys.exit(2)
-
-signal.signal(signal.SIGFPE, handler)
-signal.signal(signal.SIGABRT, handler)
-signal.signal(signal.SIGBUS, handler)
-signal.signal(signal.SIGILL, handler)
-signal.signal(signal.SIGSEGV, handler)
 
 sim.setup(threads=args.threads, min_delay=.1)
 
@@ -120,7 +98,10 @@ for i in range(args.s2_prototype_cells):
     if not s2_plots_dir_path.exists():
         s2_plots_dir_path.mkdir(parents=True)
 
-out_dumpfile = open(args.weights_to, 'wb')
+dumpfile_name = 'S2_weights/{}.bin'.format(dataset_label)
+out_dumpfile = open(dumpfile_name, 'wb')
+
+epoch_weights = [] # type: List[Tuple[int], List[Dict[str, np.array]]]
 
 print('========= Start simulation =========')
 start_time = time.clock()
@@ -145,6 +126,10 @@ for i in range(args.image_count):
             vis.reconstruct_S2_features(current_weights,
                                         feature_imgs_dict,
                                         args.feature_size))
+    if (i + 1) % args.epoch == 0:
+        current_weights = nw.get_current_weights(layer_collection['S2'],
+                                                 args.s2_prototype_cells)
+        epoch_weights.append((i + 1, current_weights))
 end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
@@ -155,7 +140,8 @@ cv2.imwrite('{}/{}_{}_images.png'.format(\
     vis.reconstruct_S2_features(current_weights,
                                 feature_imgs_dict,
                                 args.feature_size))
-print('Dumping trained weights to file', args.weights_to)
-pickle.dump(current_weights, out_dumpfile)
+print('Dumping weights for the selected epochs to file', dumpfile_name)
+pickle.dump(epoch_weights, out_dumpfile, protocol=4)
+out_dumpfile.close()
 
 sim.end()
