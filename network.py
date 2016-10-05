@@ -158,7 +158,7 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
                 in_neuron = input_layer.population[view_elements[i]]
                 conn = nest.GetConnections(source=[in_neuron],
                                            target=[out_neuron])
-                nest.SetStatus(conn, {'label': label, 'weight': weights[i]})
+                nest.SetStatus(conn, {'label': label, 'weight': weights[i][0]})
         else:
             for i in range(len(view_elements)):
                 label = '{}_{}_{}'.format(ol, il, i)
@@ -614,7 +614,8 @@ def initialize_label_dicts(s2_prototype_cells: int, f_s: int)\
                     .format(prototype, label, i)] = ([], [])
     return s2_label_dicts
 
-def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace)\
+def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
+                     s2_prototype_cells, refrac_s2=.1, stdp=True)\
         -> Dict[float, List[Layer]]:
     """
     Creates all prototype S2 layers for all sizes.
@@ -623,13 +624,19 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
         `layers_dict`: A dictionary containing for each size a list of C1
                        layers, for each feature one
 
-        `args`: The command-line arguments object
+        `feature_size`:
+
+        `s2_prototype_cells`:
+
+        `refrac_s2`:
+
+        `stdp`: 
 
     Returns:
         A dictionary containing for each size a list of different S2
         layers, for each prototype one.
     """
-    f_s = args.feature_size
+    f_s = feature_size
     initial_weight = 15.36 / (f_s * f_s)
     weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
                                                   sigma=initial_weight / 20)
@@ -637,36 +644,39 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
     weights = list(map(lambda x: weight_rng.next() * 1000, range(4 * f_s * f_s)))
     S2_layers = {}
     i_offsets = list(map(lambda x: i_offset_rng.next(),
-                     range(args.s2_prototype_cells)))
-    ndicts = list(map(lambda x: {}, range(args.s2_prototype_cells)))
-    ondicts = list(map(lambda x: {}, range(args.s2_prototype_cells)))
-    omdicts = list(map(lambda x: {}, range(args.s2_prototype_cells)))
+                     range(s2_prototype_cells)))
+    ndicts = list(map(lambda x: {}, range(s2_prototype_cells)))
+    ondicts = list(map(lambda x: {}, range(s2_prototype_cells)))
+    omdicts = list(map(lambda x: {}, range(s2_prototype_cells)))
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
         l_i_offsets = [list(map(lambda x: rnd.RandomDistribution('normal',
                          mu=i_offsets[i], sigma=.25).next(), range(n * m)))\
-                            for i in range(args.s2_prototype_cells)]
+                            for i in range(s2_prototype_cells)]
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(i_offset=l_i_offsets[i],
-                                                     tau_refrac=args.refrac_s2),
+                                                     tau_refrac=refrac_s2),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=str(i)), (n, m)),
-                              range(args.s2_prototype_cells)))
+                              range(s2_prototype_cells)))
         for S2_layer in layer_list:
             for C1_layer in layers:
                 S2_layer.projections[C1_layer.population.label] =\
                     connect_layer_to_layer(C1_layer, S2_layer, (f_s, f_s), f_s,
-                                           weights, stdp=True,
+                                           [[w] for w in weights[:f_s * f_s]],
+                                           stdp=stdp,
                                            initial_weight=initial_weight,
                                            ndicts=ndicts, ondicts=ondicts,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
+    if not stdp:
+        return S2_layers
     # Set the labels of the shared connections
     t = time.clock()
     print('Set shared labels')
     for s2_label_dicts in [ndicts, ondicts, omdicts]:
-        for i in range(args.s2_prototype_cells):
+        for i in range(s2_prototype_cells):
             w_iter = weights.__iter__()
             for label, (source, target) in s2_label_dicts[i].items():
                 conns = nest.GetConnections(source=source, target=target)
@@ -709,7 +719,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], args: ap.Namespace
 
 def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
                    active_layer=None, first_neuron=0,
-                   weights_dict=None) -> None:
+                   weights_dict_list=None) -> None:
     """
     Set the weights of a prototype S2 layer either to the weights of a specific
     neuron in the given layer or to a given dict of weights
@@ -726,18 +736,19 @@ def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
         `first_neuron`: The neuron in active_layer from which to copy the
                         weights to the S2_layers
                         
-        `weights_dict`: A dictionary containing for each feature label a
-                        weights array to be copied to the S2_layers
+        `weights_dict_list`: A list containing for each prototype a dictionary
+                             containing for each feature label a weights array
+                             to be copied to the S2_layers
     """
     for layer_list in S2_layers.values():
         current_layer = layer_list[prototype]
         for label, projections in current_layer.projections.items():
             for proj in projections:
-                if weights_dict == None:
+                if weights_dict_list == None:
                     proj.set(weight=active_layer.projections[label][first_neuron]\
                                                         .get('weight', 'array'))
                 else:
-                    proj.set(weight=weights_dict[prototype][label])
+                    proj.set(weight=weights_dict_list[prototype][label])
 
 def update_shared_weights(S2_layers: Dict[float, Sequence[Layer]],
                           s2_prototype_cells: int) -> List[Dict[str, np.array]]:
@@ -807,6 +818,35 @@ def get_current_weights(S2_layers: Dict[float, Sequence[Layer]],
     for i in range(s2_prototype_cells):
         weights_dict_list.append(\
             dict([(label, projections[0].get('weight', 'array'))\
-            for label, projections in\
-                list(S2_layers.values())[0][i].projections.items()]))
+                    for label, projections in\
+                        list(S2_layers.values())[0][i].projections.items()]))
     return weights_dict_list
+
+def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
+                     s2_prototype_cells: int) -> List[sim.Population]:
+    """
+    Creates the populations of the C2 layer, one for each S2 prototype cell,
+    containing only a single cell which max-pools the spikes of all layers of a
+    prototype.
+
+    Parameters:
+        `S2_layers`: A dictionary containing for each scale a list of S2
+                     layers, one for each prototype cell
+
+        `s2_prototype_cells`: The number of S2 prototype cells
+
+    Returns:
+        A list of populations of size one, one population for each prototype
+        cell
+    """
+    C2_populations = [sim.Population(1, sim.IF_curr_exp(), label=str(prot))\
+                        for prot in range(s2_prototype_cells)]
+    total_connections = sum(map(lambda ll: ll[0].shape[0] * ll[0].shape[1],
+                                S2_layers.values()))
+    print('total_connections', total_connections)
+    for s2ll in S2_layers.values():
+        for prot in range(s2_prototype_cells):
+            sim.Projection(s2ll[prot].population, C2_populations[prot],
+                           sim.AllToAllConnector(),
+                           sim.StaticSynapse(weight=17.15 / total_connections))
+    return C2_populations

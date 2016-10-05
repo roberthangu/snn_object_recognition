@@ -274,6 +274,8 @@ def plot_C1_spikes(C1_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
 
         `image_name`: The name of the image that will be written. This string
                       will be a part of the actual plot file name.
+
+        `out_dir_name`: The directory where to save the plots
     """
     spike_panels = []
     for size, layers in C1_layers.items():
@@ -298,6 +300,10 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
 
         `image_name`: The name of the image that will be written. This string
                       will be a part of the actual plot file name.
+
+        `s2_prototype_cells`: The number of S2 prototype cells
+
+        `out_dir_name`: The top level directory where to save the plots
     """
     for i in range(s2_prototype_cells):
         spike_panels = []
@@ -312,3 +318,21 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
               xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))
         plt.Figure(*spike_panels).save('{}/{}/S2_{}_prototype{}.png'.format(\
                                             out_dir_name, i, image_name, i))
+
+def plot_C2_spikes(C2_populations, plot_name, out_dir_name='plots/C2/'):
+    """
+    Plots the C2 spikes
+
+    Parameters:
+        `C2_populations`: A list containing for each prototype a population of
+                          one neuron
+
+        `out_dir_name`: The directory where to save the plot
+
+        `plot_name`: The name of the image
+    """
+    spike_panels = [plt.Panel(pop.get_data(clear=True).segments[0].spiketrains,
+                              xticks=True, yticks=True,
+                              xlabel='Prototype' + pop.label)\
+                        for pop in C2_populations]
+    plt.Figure(*spike_panels).save('{}/{}.png'.format(out_dir_name, plot_name))
