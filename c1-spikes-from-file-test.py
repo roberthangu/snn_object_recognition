@@ -20,7 +20,7 @@ parser.add_argument('--c1-dumpfile', type=str, required=True,
 parser.add_argument('--dataset-label', type=str, required=True,
                     help='The name of the dataset which was used for\
                     training')
-parser.add_argument('--epoch', type=int, default=30,
+parser.add_argument('--epoch-size', type=int, default=30,
                     help='The lenght of an epoch')
 parser.add_argument('--feature-size', type=int, default=3,
                      help='The size of the features to be learnt')
@@ -128,7 +128,7 @@ for i in range(args.image_count):
             vis.reconstruct_S2_features(current_weights,
                                         feature_imgs_dict,
                                         args.feature_size))
-    if (i + 1) % args.epoch == 0:
+    if (i + 1) % args.epoch_size == 0:
         current_weights = nw.get_current_weights(layer_collection['S2'],
                                                  args.s2_prototype_cells)
         epoch_weights.append((i + 1, current_weights))
@@ -143,7 +143,7 @@ cv2.imwrite('{}/{}_{}_images.png'.format(\
                                 feature_imgs_dict,
                                 args.feature_size))
 # Also add the weights of the last iteration to the dumpfile
-if args.image_count % args.epoch != 0:
+if args.image_count % args.epoch_size != 0:
     epoch_weights.append((args.image_count, current_weights))
 print('Dumping weights for the selected epochs to file', dumpfile_name)
 pickle.dump(epoch_weights, out_dumpfile, protocol=4)
