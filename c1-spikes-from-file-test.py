@@ -89,14 +89,16 @@ for layer_list in layer_collection['S2'].values():
 reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
 if not reconstructions_dir_dataset_path.exists():
     reconstructions_dir_dataset_path.mkdir(parents=True)
-c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
-if not c1_plots_dir_path.exists():
-    c1_plots_dir_path.mkdir(parents=True)
-s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
-for i in range(args.s2_prototype_cells):
-    s2_plots_dir_path = s2_plots_dataset_dir / str(i)
-    if not s2_plots_dir_path.exists():
-        s2_plots_dir_path.mkdir(parents=True)
+if args.plot_c1_spikes:
+    c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
+    if not c1_plots_dir_path.exists():
+        c1_plots_dir_path.mkdir(parents=True)
+if args.plot_s2_spikes:
+    s2_plots_dataset_dir = plb.Path('plots/S2/' + dataset_label)
+    for i in range(args.s2_prototype_cells):
+        s2_plots_dir_path = s2_plots_dataset_dir / str(i)
+        if not s2_plots_dir_path.exists():
+            s2_plots_dir_path.mkdir(parents=True)
 
 dumpfile_name = 'S2_weights/{}.bin'.format(dataset_label)
 out_dumpfile = open(dumpfile_name, 'wb')
