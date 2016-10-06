@@ -1,28 +1,39 @@
 #!/bin/ipython
 import numpy as np
 import cv2
-import sys
 import pyNN.nest as sim
 import pathlib as plb
 import time
 import pickle
 import argparse as ap
-import signal
+from sklearn import svm, metrics
 
 import common as cm
 import network as nw
 import visualization as vis
-import time
 
 parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
-parser.add_argument('--c1-dumpfile', type=str, required=True,
-                    help='The output file to contain the C1 spiketrains')
+parser.add_argument('--training-c1-dumpfile', type=str, required=True,
+                    help='The output file to contain the C1 spiketrains for\
+                         training')
+parser.add_argument('--validation-c1-dumpfile', type=str, required=True,
+                    help='The output file to contain the C1 spiketrains for\
+                         validation')
 parser.add_argument('--dataset-label', type=str, required=True,
                     help='The name of the dataset which was used for\
                     training')
-parser.add_argument('--image-count', type=int, required=True,
-                    help='The number of images to read from the training\
-                   directory')
+parser.add_argument('--training-image-count', type=int, required=True,
+                    help='The number of iterations for the images from the\
+                         training dataset')
+parser.add_argument('--validation-image-count', type=int, required=True,
+                    help='The number of iterations for the images from the\
+                         validation dataset')
+parser.add_argument('--training-labels', type=str, required=True,
+                    help='Text file which contains the labels of the training\
+                          dataset')
+parser.add_argument('--validation-labels', type=str, required=True,
+                    help='Text file which contains the labels of the validation\
+                          dataset')
 parser.add_argument('--plot-c1-spikes', action='store_true',
                     help='Plot the spike trains of the C1 layers')
 parser.add_argument('--plot-c2-spikes', action='store_true',
@@ -42,7 +53,7 @@ layer_collection = {}
 
 print('Create C1 layers')
 t1 = time.clock()
-dumpfile = open(args.c1_dumpfile, 'rb')
+dumpfile = open(args.training_c1_dumpfile, 'rb')
 ddict = pickle.load(dumpfile)
 layer_collection['C1'] = {}
 sizes = ''
@@ -80,9 +91,9 @@ for prototype in range(s2_prototype_cells):
                       weights_dict_list=weights_dict_list)
 print('S2 creation took {} s'.format(time.clock() - t1))
 
-dataset_label = '{}_fs{}_{}imgs_{}ms_scales{}'.format(args.dataset_label,
-                                        f_s, args.image_count,
-                                        int(args.sim_time), sizes)
+dataset_label = '{}_fs{}_{}imgs_{}ms_scales{}'.format(args.dataset_label, f_s,
+                        args.training_image_count + args.validation_image_count,
+                        int(args.sim_time), sizes)
 
 print('Creating C2 layers')
 t1 = time.clock()
@@ -98,9 +109,8 @@ if args.plot_s2_spikes:
     for layer_list in layer_collection['S2'].values():
         for layer in layer_list:
             layer.population.record(['spikes', 'v'])
-if args.plot_c2_spikes:
-    for pop in layer_collection['C2']:
-        pop.record('spikes')
+for pop in layer_collection['C2']:
+    pop.record('spikes')
 
 if args.plot_c1_spikes:
     c1_plots_dir_path = plb.Path('plots/C1/' + dataset_label)
@@ -116,11 +126,16 @@ if args.plot_c2_spikes:
     c2_plots_dir_path = plb.Path('plots/C2/' + dataset_label)
     if not c2_plots_dir_path.exists():
         c2_plots_dir_path.mkdir(parents=True)
+training_labels = open(args.training_labels, 'r').read().splitlines()
+validation_labels = open(args.validation_labels, 'r').read().splitlines()
+training_samples = []
+validation_samples = []
 
+print('>>>>>>>>> Extracting data samples for fitting <<<<<<<<<')
 print('========= Start simulation =========')
 start_time = time.clock()
-for i in range(args.image_count):
-    print('Simulating for image number', i)
+for i in range(args.training_image_count):
+    print('Simulating for training image number', i)
     sim.run(args.sim_time)
     if args.plot_c1_spikes:
         vis.plot_C1_spikes(layer_collection['C1'],
@@ -131,12 +146,54 @@ for i in range(args.image_count):
                        '{}_image_{}'.format(dataset_label, i),
                        s2_prototype_cells,
                        out_dir_name=s2_plots_dataset_dir.as_posix())
+    spikes =\
+        [list(layer_collection['C2'][prot].get_spike_counts().values())[0]\
+            for prot in range(s2_prototype_cells)]
+    training_samples.append(spikes)
+    for prot in range(s2_prototype_cells):
+        layer_collection['C2'][prot].get_data(clear=True)
     if args.plot_c2_spikes:
-        vis.plot_C2_spikes(layer_collection['C2'],
+        vis.plot_C2_spikes(layer_collection['C2'], i, args.sim_time,
                            '{}_epoch_{}_image_{}'.format(dataset_label, epoch, i),
                            out_dir_name=c2_plots_dir_path.as_posix())
 end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
+
+print('Setting C1 spike trains to the validation dataset')
+dumpfile = open(args.validation_c1_dumpfile, 'rb')
+ddict = pickle.load(dumpfile)
+for size, layers_as_dicts in ddict.items():
+    for layer_as_dict in layers_as_dicts:
+        spiketrains = layer_as_dict['segment'].spiketrains
+        dimensionless_sts = [[s for s in st] for st in spiketrains]
+        the_layer_iter = filter(lambda layer: layer.population.label\
+                        == layer_as_dict['label'], layer_collection['C1'][size])
+        the_layer_iter.__next__().population.set(spike_times=dimensionless_sts)
+
+print('>>>>>>>>> Extracting data samples for validation <<<<<<<<<')
+print('========= Start simulation =========')
+for i in range(args.validation_image_count):
+    print('Simulating for validation image number', i)
+    sim.run(args.sim_time)
+    spikes =\
+        [list(layer_collection['C2'][prot].get_spike_counts().values())[0]\
+            for prot in range(s2_prototype_cells)]
+    validation_samples.append(spikes)
+    for prot in range(s2_prototype_cells):
+        layer_collection['C2'][prot].get_data(clear=True)
+print('========= Stop  simulation =========')
+
+print('Fitting SVM model onto the training samples')
+
+clf = svm.SVC(kernel='linear')
+clf.fit(training_samples, training_labels)
+
+print('Predicting the categories of the validation samples')
+predicted_labels = clf.predict(validation_samples)
+print('Prediction is')
+print(metrics.classification_report(validation_labels, predicted_labels))
+print('Confusion matrix is')
+print(metrics.confusion_matrix(validation_labels, predicted_labels))
 
 sim.end()

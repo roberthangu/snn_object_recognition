@@ -670,8 +670,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                            ndicts=ndicts, ondicts=ondicts,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
-    if not stdp:
-        return S2_layers
+#    if not stdp:
+#        return S2_layers
     # Set the labels of the shared connections
     t = time.clock()
     print('Set shared labels')
@@ -696,7 +696,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                              delay=inh_delay))
     # ...and between the layers
     print('Create S2 cross-scale inhibitory connections')
-    for i in range(args.s2_prototype_cells):
+    for i in range(s2_prototype_cells):
         for layer_list1 in S2_layers.values():
             for layer_list2 in S2_layers.values():
                 if layer_list1[i] != layer_list2[i]:
@@ -848,5 +848,5 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
         for prot in range(s2_prototype_cells):
             sim.Projection(s2ll[prot].population, C2_populations[prot],
                            sim.AllToAllConnector(),
-                           sim.StaticSynapse(weight=17.15 / total_connections))
+                           sim.StaticSynapse(weight=4 * 17.15 / total_connections))
     return C2_populations
