@@ -843,7 +843,6 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
                         for prot in range(s2_prototype_cells)]
     total_connections = sum(map(lambda ll: ll[0].shape[0] * ll[0].shape[1],
                                 S2_layers.values()))
-    print('total_connections', total_connections)
     for s2ll in S2_layers.values():
         for prot in range(s2_prototype_cells):
             sim.Projection(s2ll[prot].population, C2_populations[prot],
