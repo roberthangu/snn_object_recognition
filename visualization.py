@@ -2,6 +2,7 @@ from typing import Dict, Sequence, List
 import numpy as np
 import pathlib as plb
 import pyNN.utility.plotting as plt
+import matplotlib.pyplot as mplt
 import network as nw
 import cv2
 
@@ -319,7 +320,8 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
         plt.Figure(*spike_panels).save('{}/{}/S2_{}_prototype{}.png'.format(\
                                             out_dir_name, i, image_name, i))
 
-def plot_C2_spikes(C2_populations, plot_name, out_dir_name='plots/C2/'):
+def plot_C2_spikes(C2_populations, it, sim_time, plot_name,
+                   out_dir_name='plots/C2/'):
     """
     Plots the C2 spikes
 
@@ -331,8 +333,21 @@ def plot_C2_spikes(C2_populations, plot_name, out_dir_name='plots/C2/'):
 
         `plot_name`: The name of the image
     """
-    spike_panels = [plt.Panel(pop.get_data(clear=True).segments[0].spiketrains,
-                              xticks=True, yticks=True,
-                              xlabel='Prototype' + pop.label)\
-                        for pop in C2_populations]
-    plt.Figure(*spike_panels).save('{}/{}.png'.format(out_dir_name, plot_name))
+    fig_settings = {
+        'lines.linewidth': 0.5,
+        'axes.linewidth': 0.5,
+        'axes.labelsize': 'small',
+        'legend.fontsize': 'small',
+    }
+    mplt.rcParams.update(fig_settings)
+    mplt.figure(figsize=(10, 6))
+    start_time = it * sim_time
+    mplt.axis([start_time, start_time + sim_time, -.2, len(C2_populations) - .8])
+    mplt.xlabel('Time (ms)')
+    mplt.ylabel('Neuron index')
+    mplt.grid(True)
+    for i in range(len(C2_populations)):
+        st = C2_populations[i].get_data().segments[0].spiketrains[0]
+        mplt.plot(st, np.ones_like(st) * i, '.')
+
+    mplt.savefig('{}/{}.png'.format(out_dir_name, plot_name))
