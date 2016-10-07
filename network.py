@@ -685,7 +685,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
     print('Setting labels took', time.clock() - t)
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = -2
+    inh_weight = -6
     inh_delay = .1
     print('Create S2 self inhibitory connections')
     for layer_list in S2_layers.values():
