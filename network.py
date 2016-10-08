@@ -143,9 +143,9 @@ def connect_layers(input_layer, output_layer, weights, i_s, j_s, i_e, j_e,
         i += 1
 
     if stdp:
-        w_max = initial_weight * 10
+        w_max = initial_weight * 15
         stdp_shared = sim.native_synapse_type('stdp_synapse_shared')\
-                       (Wmax=w_max * 1000, mu_plus=1.0, mu_minus=1.0, label=str)
+                       (Wmax=w_max * 1000, mu_plus=0.0, mu_minus=1.0, label=str)
         proj = sim.Projection(input_layer.population[view_elements],
                               output_layer.population[[k_out]],
                               sim.AllToAllConnector(), stdp_shared)
@@ -637,7 +637,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
         layers, for each prototype one.
     """
     f_s = feature_size
-    initial_weight = 15.36 / (f_s * f_s)
+    initial_weight = 25 / (f_s * f_s)
     weight_rng = rnd.RandomDistribution('normal', mu=initial_weight,
                                                   sigma=initial_weight / 20)
     i_offset_rng = rnd.RandomDistribution('normal', mu=.5, sigma=.45)
@@ -685,7 +685,7 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
     print('Setting labels took', time.clock() - t)
     # Create inhibitory connections between the S2 cells
     # First between the neurons of the same layer...
-    inh_weight = -6
+    inh_weight = -10
     inh_delay = .1
     print('Create S2 self inhibitory connections')
     for layer_list in S2_layers.values():

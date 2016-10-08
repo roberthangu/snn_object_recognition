@@ -78,7 +78,8 @@ print('Creating S2 layers')
 t1 = time.clock()
 layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'],
                                              args.feature_size,
-                                             args.s2_prototype_cells)
+                                             args.s2_prototype_cells,
+                                             refrac_s2=6)
 print('S2 creation took {} s'.format(time.clock() - t1))
 
 for layers in layer_collection['C1'].values():
