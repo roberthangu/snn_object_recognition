@@ -75,15 +75,16 @@ print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 
 ddict = {}
-filename = 'C1_spike_data/' + args.dataset_label + '_scales'
+dataset_label = '{}_{}imgs_{}ms_{}px_scales'.format(args.dataset_label,
+                                   args.image_count, args.sim_time,
+                                   imgs[0][1].shape[0])
 for size, layers in layer_collection['C1'].items():
     ddict[size] = [{'segment': layer.population.get_data().segments[0],
                     'shape': layer.shape,
                     'label': layer.population.label } for layer in layers]
-    filename += '_{}'.format(size)
+    dataset_label += '_{}'.format(size)
 
-dumpname = '{}_{}imgs_{}ms.bin'.format(filename, args.image_count,
-                                               args.sim_time)
+dumpname = 'C1_spike_data/{}.bin'.format(dataset_label)
 print('Dumping spikes for all scales and layers to file', dumpname)
 dumpfile = open(dumpname, 'wb')
 pickle.dump(ddict, dumpfile, protocol=4)

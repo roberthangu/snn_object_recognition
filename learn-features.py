@@ -7,7 +7,7 @@ import pathlib as plb
 import time
 import pickle
 import argparse as ap
-import signal
+import re
 
 import common as cm
 import network as nw
@@ -17,27 +17,19 @@ import time
 parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
 parser.add_argument('--c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains')
-parser.add_argument('--dataset-label', type=str, required=True,
-                    help='The name of the dataset which was used for\
-                    training')
 parser.add_argument('--epoch-size', type=int, default=30,
                     help='The lenght of an epoch')
 parser.add_argument('--feature-size', type=int, default=3,
                      help='The size of the features to be learnt')
 parser.add_argument('--s2-prototype-cells', type=int, default=3,
                     help='The number of S2 features to compute')
-parser.add_argument('--image-count', type=int, required=True,
-                    help='The number of images to read from the training\
-                    directory')
 parser.add_argument('--plot-c1-spikes', action='store_true',
                     help='Plot the spike trains of the C1 layers')
 parser.add_argument('--plot-s2-spikes', action='store_true',
                     help='Plot the spike trains of the S2 layers')
-parser.add_argument('--refrac-s2', type=float, default=.1, metavar='.1',
-                    help='The refractory period of neurons in the S2 layer in\
-                    ms')
-parser.add_argument('--sim-time', default=50, type=float, metavar='50',
-                     help='Simulation time')
+#parser.add_argument('--refrac-s2', type=float, default=.1, metavar='.1',
+#                    help='The refractory period of neurons in the S2 layer in\
+#                    ms')
 parser.add_argument('--threads', default=1, type=int)
 args = parser.parse_args()
 
@@ -51,9 +43,13 @@ for filepath in plb.Path('features_gabor').iterdir():
     feature_imgs_dict[filepath.stem] = cv2.imread(filepath.as_posix(),
                                                   cv2.CV_8UC1)
 
-dataset_label = '{}_fs{}_{}imgs_{}ms_scales'.format(args.dataset_label,
-                                        args.feature_size, args.image_count,
-                                        int(args.sim_time))
+# Extracting meta-information about the simulation from the filename
+c1_dumpfile_name = plb.Path(args.c1_dumpfile).stem
+image_count = int(re.search('\d*imgs', c1_dumpfile_name).group()[:-4])
+sim_time = float(re.search('\d+\.\d+ms', c1_dumpfile_name).group()[:-2])
+print('image_count', image_count)
+print('sim_time', sim_time)
+dataset_label = '{}_fs{}'.format(c1_dumpfile_name, args.feature_size)
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -61,7 +57,6 @@ dumpfile = open(args.c1_dumpfile, 'rb')
 ddict = pickle.load(dumpfile)
 layer_collection['C1'] = {}
 for size, layers_as_dicts in ddict.items():
-    dataset_label += '_{}'.format(str(size))
     layer_list = []
     for layer_as_dict in layers_as_dicts:
         n, m = layer_as_dict['shape']
@@ -110,9 +105,9 @@ epoch_weights = [] # type: List[Tuple[int], List[Dict[str, np.array]]]
 
 print('========= Start simulation =========')
 start_time = time.clock()
-for i in range(args.image_count):
+for i in range(image_count):
     print('Simulating for image number', i)
-    sim.run(args.sim_time)
+    sim.run(sim_time)
     if args.plot_c1_spikes:
         vis.plot_C1_spikes(layer_collection['C1'],
                            '{}_image_{}'.format(dataset_label, i),
@@ -146,8 +141,8 @@ cv2.imwrite('{}/{}_{}_images.png'.format(\
                                 feature_imgs_dict,
                                 args.feature_size))
 # Also add the weights of the last iteration to the dumpfile
-if args.image_count % args.epoch_size != 0:
-    epoch_weights.append((args.image_count, current_weights))
+if image_count % args.epoch_size != 0:
+    epoch_weights.append((image_count, current_weights))
 print('Dumping weights for the selected epochs to file', dumpfile_name)
 pickle.dump(epoch_weights, out_dumpfile, protocol=4)
 out_dumpfile.close()

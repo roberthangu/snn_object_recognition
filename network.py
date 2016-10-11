@@ -650,9 +650,12 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
     omdicts = list(map(lambda x: {}, range(s2_prototype_cells)))
     for size, layers in C1_layers.items():
         n, m = how_many_squares_in_shape(layers[0].shape, (f_s, f_s), f_s)
-        l_i_offsets = [list(map(lambda x: rnd.RandomDistribution('normal',
-                         mu=i_offsets[i], sigma=.25).next(), range(n * m)))\
-                            for i in range(s2_prototype_cells)]
+        if stdp:
+            l_i_offsets = [list(map(lambda x: rnd.RandomDistribution('normal',
+                             mu=i_offsets[i], sigma=.25).next(), range(n * m)))\
+                                for i in range(s2_prototype_cells)]
+        else:
+            l_i_offsets = np.zeros((s2_prototype_cells, n * m))
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(i_offset=l_i_offsets[i],

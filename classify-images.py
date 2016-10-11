@@ -7,6 +7,7 @@ import time
 import pickle
 import argparse as ap
 import sys
+import re
 from sklearn import svm, metrics
 
 import common as cm
@@ -22,20 +23,12 @@ parser.add_argument('--training-c1-dumpfile', type=str, required=True,
 parser.add_argument('--validation-c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains for\
                          validation')
-parser.add_argument('--training-image-count', type=int, required=True,
-                    help='The number of iterations for the images from the\
-                         training dataset')
-parser.add_argument('--validation-image-count', type=int, required=True,
-                    help='The number of iterations for the images from the\
-                         validation dataset')
 parser.add_argument('--training-labels', type=str, required=True,
                     help='Text file which contains the labels of the training\
                           dataset')
 parser.add_argument('--validation-labels', type=str, required=True,
                     help='Text file which contains the labels of the validation\
                           dataset')
-parser.add_argument('--sim-time', default=50, type=float, metavar='50',
-                     help='Simulation time')
 parser.add_argument('--threads', default=1, type=int)
 parser.add_argument('--weights-from', type=str, required=True,
                     help='Dumpfile of the S2 weight array')
@@ -44,6 +37,15 @@ args = parser.parse_args()
 sim.setup(threads=args.threads, min_delay=.1)
 
 layer_collection = {}
+
+# Extracting meta-information about the simulation from the filename
+training_dumpfile_name = plb.Path(args.training_c1_dumpfile).stem
+validation_dumpfile_name = plb.Path(args.validation_c1_dumpfile).stem
+training_image_count = int(re.search('\d*imgs',
+                                     training_dumpfile_name).group()[:-4])
+validation_image_count = int(re.search('\d*imgs',
+                                       validation_dumpfile_name).group()[:-4])
+sim_time = float(re.search('\d+\.\d+ms', validation_dumpfile_name).group()[:-2])
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -68,7 +70,8 @@ weights_dict_list = epoch_weights_list[-1][1]
 f_s = int(np.sqrt(list(weights_dict_list[0].values())[0].shape[0]))
 s2_prototype_cells = len(weights_dict_list)
 layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], f_s,
-                                             s2_prototype_cells, stdp=False)
+                                             s2_prototype_cells, refrac_s2=.1,
+                                             stdp=False)
 
 print('Creating C2 layers')
 t1 = time.clock()
@@ -117,18 +120,24 @@ for epoch, weights_dict_list in epoch_weights_list:
         nw.set_s2_weights(layer_collection['S2'], prototype,
                           weights_dict_list=weights_dict_list)
 
+    # TODO: Try to run this again with the S2 weights setting code also after
+    # the extraction of the training samples (seems not to make a difference)
+    # Also try to remove the inhibition between the S2 layers
+
     training_samples = []
     validation_samples = []
 
     print('Setting C1 spike trains to the training dataset')
     set_c1_spiketrains(training_ddict)
     print('>>>>>>>>> Extracting data samples for fitting <<<<<<<<<')
-    training_samples = extract_data_samples(args.training_image_count)
+    training_samples = extract_data_samples(training_image_count)
+    sim.reset()
 
     print('Setting C1 spike trains to the validation dataset')
     set_c1_spiketrains(validation_ddict)
     print('>>>>>>>>> Extracting data samples for validation <<<<<<<<<')
-    validation_samples = extract_data_samples(args.validation_image_count)
+    validation_samples = extract_data_samples(validation_image_count)
+    sim.reset()
 
     print('Fitting SVM model onto the training samples')
 
@@ -140,9 +149,11 @@ for epoch, weights_dict_list in epoch_weights_list:
     print('============================================================',
           file=logfile)
     print('Epoch', epoch, file=logfile)
-    print(metrics.classification_report(validation_labels, predicted_labels),
-          file=logfile)
-    print(metrics.confusion_matrix(validation_labels, predicted_labels),
-          file=logfile)
+    clf_report = metrics.classification_report(validation_labels, predicted_labels)
+    conf_matrix = metrics.confusion_matrix(validation_labels, predicted_labels)
+    print(clf_report, file=logfile)
+    print(clf_report)
+    print(conf_matrix, file=logfile)
+    print(conf_matrix)
 
 sim.end()
