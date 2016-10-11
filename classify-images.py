@@ -15,8 +15,6 @@ import network as nw
 import visualization as vis
 
 parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
-parser.add_argument('--logfile', type=str,
-                    help='File to output classification results')
 parser.add_argument('--training-c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains for\
                          training')
@@ -111,7 +109,7 @@ def extract_data_samples(image_count):
 
 logfile = sys.stdout
 if args.logfile != None:
-    logfile = open(args.logfile, 'w')
+    logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem, 'w'))
 
 for epoch, weights_dict_list in epoch_weights_list:
     # Set the S2 weights to those from the file

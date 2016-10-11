@@ -15,9 +15,6 @@ parser = ap.ArgumentParser('./dump-c1-spikes.py --')
 parser.add_argument('--dataset-label', type=str, required=True,
                     help='The name of the dataset which was used for\
                     training')
-parser.add_argument('--image-count', type=int,
-                    help='The number of images to read from the training\
-                    directory')
 parser.add_argument('--training-dir', type=str, required=True,
                     help='The directory with the training images')
 parser.add_argument('--refrac-c1', type=float, default=.1, metavar='0.1',
@@ -63,7 +60,7 @@ for layer_name in ['C1']:
 print('========= Start simulation =========')
 start_time = time.clock()
 count = 0
-for filename, target_img in imgs[:args.image_count]:
+for filename, target_img in imgs:
     t1 = time.clock()
     print('Simulating for', filename, 'number', count)
     count += 1
@@ -76,7 +73,7 @@ print('Simulation took', end_time - start_time, 's')
 
 ddict = {}
 dataset_label = '{}_{}imgs_{}ms_{}px_scales'.format(args.dataset_label,
-                                   args.image_count, args.sim_time,
+                                   len(imgs), args.sim_time,
                                    imgs[0][1].shape[0])
 for size, layers in layer_collection['C1'].items():
     ddict[size] = [{'segment': layer.population.get_data().segments[0],
