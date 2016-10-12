@@ -47,8 +47,6 @@ for filepath in plb.Path('features_gabor').iterdir():
 c1_dumpfile_name = plb.Path(args.c1_dumpfile).stem
 image_count = int(re.search('\d*imgs', c1_dumpfile_name).group()[:-4])
 sim_time = float(re.search('\d+\.\d+ms', c1_dumpfile_name).group()[:-2])
-print('image_count', image_count)
-print('sim_time', sim_time)
 dataset_label = '{}_fs{}'.format(c1_dumpfile_name, args.feature_size)
 
 print('Create C1 layers')
