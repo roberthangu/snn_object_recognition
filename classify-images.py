@@ -96,8 +96,8 @@ def extract_data_samples(image_count):
     samples = []
     print('========= Start simulation =========')
     for i in range(image_count):
-        print('Simulating for training image number', i)
-        sim.run(args.sim_time)
+        print('Simulating for image number', i)
+        sim.run(sim_time)
         spikes =\
             [list(layer_collection['C2'][prot].get_spike_counts().values())[0]\
                 for prot in range(s2_prototype_cells)]
@@ -107,7 +107,7 @@ def extract_data_samples(image_count):
     print('========= Stop  simulation =========')
     return samples
 
-logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem, 'w'))
+logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem), 'w')
 
 for epoch, weights_dict_list in epoch_weights_list:
     # Set the S2 weights to those from the file
