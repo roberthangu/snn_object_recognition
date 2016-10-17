@@ -259,7 +259,11 @@ def reconstruct_S2_features(weights_dicts: Sequence[Dict[str, np.array]],
                 copy_to_visualization(i, weights[i][0] / max_weight,
                                       feature_imgs_dict[label], canvas,
                                       (f_s, f_s), 6)
-        copy_to_visualization(prototype, 1, canvas, big_canvas, (n, m),
+        boxed_canvas = 70 * np.ones((t_side_length, t_side_length))
+        for i in range(f_side_length):
+            for j in range(f_side_length):
+                boxed_canvas[i + 1][j + 1] = canvas[i][j]
+        copy_to_visualization(prototype, 1, boxed_canvas, big_canvas, (n, m),
                               t_side_length, overfull=False)
     return big_canvas
 
