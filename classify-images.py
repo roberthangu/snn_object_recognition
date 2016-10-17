@@ -107,9 +107,7 @@ def extract_data_samples(image_count):
     print('========= Stop  simulation =========')
     return samples
 
-logfile = sys.stdout
-if args.logfile != None:
-    logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem, 'w'))
+logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem, 'w'))
 
 for epoch, weights_dict_list in epoch_weights_list:
     # Set the S2 weights to those from the file

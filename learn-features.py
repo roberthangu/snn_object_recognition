@@ -47,7 +47,8 @@ for filepath in plb.Path('features_gabor').iterdir():
 c1_dumpfile_name = plb.Path(args.c1_dumpfile).stem
 image_count = int(re.search('\d*imgs', c1_dumpfile_name).group()[:-4])
 sim_time = float(re.search('\d+\.\d+ms', c1_dumpfile_name).group()[:-2])
-dataset_label = '{}_fs{}'.format(c1_dumpfile_name, args.feature_size)
+dataset_label = '{}_fs{}_{}prots'.format(c1_dumpfile_name, args.feature_size,
+                                         args.s2_prototype_cells)
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -99,7 +100,7 @@ if args.plot_s2_spikes:
 dumpfile_name = 'S2_weights/{}.bin'.format(dataset_label)
 out_dumpfile = open(dumpfile_name, 'wb')
 
-epoch_weights = [] # type: List[Tuple[int], List[Dict[str, np.array]]]
+epoch_weights = [] # type: List[Tuple[int, List[Dict[str, np.array]]]]
 
 print('========= Start simulation =========')
 start_time = time.clock()
@@ -118,7 +119,7 @@ for i in range(image_count):
     if (i + 1) % 10 == 0:
         current_weights = nw.get_current_weights(layer_collection['S2'],
                                                  args.s2_prototype_cells)
-        cv2.imwrite('{}/{}_{}_images.png'.format(\
+        cv2.imwrite('{}/{}_{:0>4}_images.png'.format(\
                  reconstructions_dir_dataset_path.as_posix(),
                  dataset_label, i + 1),
             vis.reconstruct_S2_features(current_weights,
@@ -132,7 +133,7 @@ end_time = time.clock()
 print('========= Stop  simulation =========')
 print('Simulation took', end_time - start_time, 's')
 # Reconstruct the last image
-cv2.imwrite('{}/{}_{}_images.png'.format(\
+cv2.imwrite('{}/{}_{:0>4}_images.png'.format(\
          reconstructions_dir_dataset_path.as_posix(),
          dataset_label, i + 1),
     vis.reconstruct_S2_features(current_weights,
