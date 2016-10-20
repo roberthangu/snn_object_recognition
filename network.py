@@ -9,7 +9,7 @@ import cv2
 import pathlib as plb
 import time
 import common as cm
-import sys
+import statistics as st
 try:
     import stream
 except ImportError:
@@ -673,8 +673,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                            ndicts=ndicts, ondicts=ondicts,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
-#    if not stdp:
-#        return S2_layers
+    if not stdp:
+        return S2_layers
     # Set the labels of the shared connections
     t = time.clock()
     print('Set shared labels')
@@ -819,10 +819,15 @@ def get_current_weights(S2_layers: Dict[float, Sequence[Layer]],
     """
     weights_dict_list = []
     for i in range(s2_prototype_cells):
-        weights_dict_list.append(\
-            dict([(label, projections[0].get('weight', 'array'))\
+        weights_dict = dict([(label, projections[0].get('weight', 'array'))\
                     for label, projections in\
-                        list(S2_layers.values())[0][i].projections.items()]))
+                        list(S2_layers.values())[0][i].projections.items()])
+        mean = st.mean(np.array(list(weights_dict.values())).ravel())
+        for weights_list in weights_dict.values():
+            for k in range(len(weights_list)):
+                if weights_list[k][0] < mean:
+                    weights_list[k][0] = 0
+        weights_dict_list.append(weights_dict)
     return weights_dict_list
 
 def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
@@ -850,5 +855,5 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
         for prot in range(s2_prototype_cells):
             sim.Projection(s2ll[prot].population, C2_populations[prot],
                            sim.AllToAllConnector(),
-                           sim.StaticSynapse(weight=4 * 17.15 / total_connections))
+                           sim.StaticSynapse(weight=17.15 / total_connections))
     return C2_populations
