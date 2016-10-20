@@ -10,10 +10,6 @@ import pathlib as plb
 import time
 import common as cm
 import statistics as st
-try:
-    import stream
-except ImportError:
-    pass
 
 class Layer:
     """
@@ -89,23 +85,6 @@ def create_spike_source_layer_from(source_np_array):
     layer = create_empty_spike_source_layer_with_shape(source_np_array.shape)
     set_spike_source_layer_rates(layer, source_np_array)
     return layer
-
-def create_spike_source_layer_from_stream(stream):
-    nNeurons = stream.shape[0] * stream.shape[1]
-    spike_times = []
-
-    for neuron in range(nNeurons):
-        spike_times.append([])
-    for event in stream.events:
-        if not event.polarity:
-            # we only consider ON events
-            pass
-        nIdx = event.x * stream.shape[0] + event.y
-        spike_times[nIdx].append(event.ts)
-
-    spike_source_layer = sim.Population(size=len(spike_times),
-                                   cellclass=sim.SpikeSourceArray(spike_times=spike_times))
-    return Layer(spike_source_layer, stream.shape)
 
 def recognizer_weights_from(feature_np_array):
     """
