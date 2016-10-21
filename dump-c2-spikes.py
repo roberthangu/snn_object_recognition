@@ -84,17 +84,14 @@ def set_c1_spiketrains(ddict):
 
 def extract_spiketrains(image_count, sim_time):
     print('========= Start simulation =========')
-    for i in range(image_count):
-        print('Simulating for image number', i)
-        sim.run(sim_time)
+    print('Simulating for', image_count, 'images')
+    sim.run(sim_time * image_count)
     print('========= Stop  simulation =========')
-    return [layer_collection['C2'][prot].get_data().segments[0].spiketrains[0]\
-                for prot in range(s2_prototype_cells)]
+    return [layer_collection['C2'][prot].get_data(clear=True).segments[0]\
+                .spiketrains[0] for prot in range(s2_prototype_cells)]
 
 c2_training_spikes = []
 c2_validation_spikes = []
-
-logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem), 'w')
 
 for epoch, weights_dict_list in epoch_weights_list:
     # Set the S2 weights to those from the file
@@ -117,10 +114,10 @@ for epoch, weights_dict_list in epoch_weights_list:
               extract_spiketrains(validation_image_count, validation_sim_time)))
     sim.reset()
 
-# TODO: Add information about the number of prototype cells and the feature size
-#       to the output C2 dumpfile names
-c2_training_dumpfile_name = 'C2_spikes/{}.bin'.format(training_dumpfile_name)
-c2_validation_dumpfile_name = 'C2_spikes/{}.bin'.format(validation_dumpfile_name)
+c2_training_dumpfile_name = 'C2_spikes/{}_fs{}_{}prots.bin'\
+                      .format(training_dumpfile_name, f_s, s2_prototype_cells)
+c2_validation_dumpfile_name = 'C2_spikes/{}_fs{}_{}prots.bin'\
+                      .format(validation_dumpfile_name, f_s, s2_prototype_cells)
 c2_training_dumpfile = open(c2_training_dumpfile_name, 'wb')
 c2_validation_dumpfile = open(c2_validation_dumpfile_name, 'wb')
 print('Dumping C2 training spikes to file', c2_training_dumpfile_name)

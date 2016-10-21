@@ -1,16 +1,13 @@
 #!/bin/ipython
 import numpy as np
-import cv2
 import pyNN.nest as sim
 import pathlib as plb
 import time
 import pickle
 import argparse as ap
-import sys
 import re
 from sklearn import svm, metrics
 
-import common as cm
 import network as nw
 import visualization as vis
 
