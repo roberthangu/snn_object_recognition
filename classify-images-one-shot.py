@@ -71,19 +71,24 @@ def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
     }
     mplt.rcParams.update(fig_settings)
     mplt.figure(figsize=(10, 8))
+    mplt.subplot(311)
     mplt.axis([0, t_sim_time, -.2, len(C2_populations) - .8])
     mplt.xlabel('Time (ms)')
     mplt.ylabel('Neuron index')
     mplt.grid(True)
-    mplt.subplot(211)
     for i in range(len(C2_populations)):
         st = C2_populations[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
-    mplt.subplot(212)
-    mplt.axis([0, t_sim_time, -.2, len(classifier_neurons) - .8])
+    mplt.subplot(312)
+#    mplt.axis([0, t_sim_time, -.2, len(classifier_neurons) - .8])
     for i in range(len(classifier_neurons)):
         st = classifier_neurons[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
+    mplt.subplot(313)
+    for i in range(len(classifier_neurons)):
+        segm = classifier_neurons[i].get_data().segments[0]
+        voltages = segm.filter(name='v')[0]
+        mplt.plot(voltages.times, voltages, label=str(i))
     mplt.savefig('plots/CLF/{}_{}.png'.format(results_label, appendix))
 
 # Datastructure to store the learned weights from all epochs
@@ -110,7 +115,7 @@ for training_pair, validation_pair in\
 
     # Record the spikes for visualization purposes
     compound_C2_population.record('spikes')
-    out_p.record('spikes')
+    out_p.record(['spikes', 'v'])
     #for pop in C2_populations:
     #    pop.record('spikes')
 
@@ -149,7 +154,7 @@ for training_pair, validation_pair in\
     # Record the spikes for visualization purposes
     compound_C2_population.record('spikes')
     for pop in classifier_neurons:
-        pop.record('spikes')
+        pop.record(['spikes', 'v'])
 
     predicted_labels = []
     # Simulate and classify the images
@@ -158,6 +163,8 @@ for training_pair, validation_pair in\
         print('Simulating for image', i)
         sim.run(validation_sim_time)
         # Find the neuron which fired most
+        # TODO: after taking the max, clear the recorded spikes with
+        #       get_data(clear=True)
         label, count = max(zip(training_labels,
                        map(lambda pop: list(pop.get_spike_counts().values())[0],
                            classifier_neurons)), key=lambda pair: pair[1])
