@@ -70,17 +70,14 @@ def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
         'legend.fontsize': 'small',
     }
     mplt.rcParams.update(fig_settings)
-    mplt.figure(figsize=(10, 8))
+    mplt.figure(figsize=(10, 10))
     mplt.subplot(311)
     mplt.axis([0, t_sim_time, -.2, len(C2_populations) - .8])
-    mplt.xlabel('Time (ms)')
-    mplt.ylabel('Neuron index')
-    mplt.grid(True)
     for i in range(len(C2_populations)):
         st = C2_populations[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
     mplt.subplot(312)
-#    mplt.axis([0, t_sim_time, -.2, len(classifier_neurons) - .8])
+    mplt.axis([0, t_sim_time, -.2, len(classifier_neurons) - .8])
     for i in range(len(classifier_neurons)):
         st = classifier_neurons[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
@@ -103,9 +100,10 @@ for training_pair, validation_pair in\
     training_spiketrains = [[s for s in st] for st in training_pair[1]]
     C2_populations, compound_C2_population =\
             create_C2_populations(training_spiketrains)
-    out_p = sim.Population(1, sim.IF_curr_exp())
-    stdp = sim.STDPMechanism(weight=.4,
-           timing_dependence=sim.SpikePairRule(tau_plus=5.0, tau_minus=5.0,
+    out_p = sim.Population(1, sim.IF_curr_exp(tau_refrac=3))
+    stdp_weight = .1
+    stdp = sim.STDPMechanism(weight=stdp_weight,
+           timing_dependence=sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
                                                A_plus=0.05, A_minus=0.03),
            weight_dependence=sim.AdditiveWeightDependence(w_min=0.0, w_max=1.0))
     learn_proj = sim.Projection(compound_C2_population, out_p,
@@ -130,7 +128,7 @@ for training_pair, validation_pair in\
         classifier_weights.append(learn_proj.get('weight', 'array'))
         print('weights')
         print(classifier_weights[-1])
-        learn_proj.set(weight=.2)
+        learn_proj.set(weight=stdp_weight)
 
     plot_spikes(C2_populations, [out_p], training_sim_time * training_image_count,
                 'training')
