@@ -283,7 +283,8 @@ def create_output_layer(input_layer, weights_tuple, delta, layer_name, refrac):
     print('Layer:', layer_name)
     print('Output layer has shape', n, m)
     output_layer = Layer(sim.Population(total_output_neurons,
-                                       sim.IF_curr_exp(tau_refrac=refrac),
+                                       sim.IF_curr_exp(tau_refrac=refrac,
+                                                       v_rest=-51),
                                        structure=space.Grid2D(aspect_ratio=m/n),
                                        label=layer_name), (n, m))
 
@@ -428,7 +429,8 @@ def create_empty_input_layers_for_scales(target: np.array, scales: [float])\
         print('Creating input layers for size', size)
         n = round(target.shape[0] * size)
         m = round(target.shape[1] * size)
-        input_layers[size] = [Layer(sim.Population(n * m, sim.IF_curr_exp(),
+        input_layers[size] = [Layer(sim.Population(n * m,
+                                                   sim.IF_curr_exp(v_rest=-51),
                                 label=feature_name), (n, m))\
                               for feature_name in feature_names] 
     return input_layers
@@ -638,7 +640,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
         print('S2 Shape', n, m)
         layer_list = list(map(lambda i: Layer(sim.Population(n * m,
                                      sim.IF_curr_exp(i_offset=l_i_offsets[i],
-                                                     tau_refrac=refrac_s2),
+                                                     tau_refrac=refrac_s2,
+                                                     v_rest=-51),
                                      structure=space.Grid2D(aspect_ratio=m/n),
                                      label=str(i)), (n, m)),
                               range(s2_prototype_cells)))
@@ -826,7 +829,8 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
         A list of populations of size one, one population for each prototype
         cell
     """
-    C2_populations = [sim.Population(1, sim.IF_curr_exp(), label=str(prot))\
+    C2_populations = [sim.Population(1, sim.IF_curr_exp(v_rest=-51),
+                                     label=str(prot))\
                         for prot in range(s2_prototype_cells)]
     total_connections = sum(map(lambda ll: ll[0].shape[0] * ll[0].shape[1],
                                 S2_layers.values()))

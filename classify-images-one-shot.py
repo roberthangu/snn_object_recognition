@@ -94,7 +94,7 @@ def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
 # Datastructure to store the learned weights from all epochs
 all_epochs_weights = []
 for training_pair, validation_pair in\
-        zip(c2_training_spikes[31:32], c2_validation_spikes[31:32]):
+        zip(c2_training_spikes, c2_validation_spikes):
 
     # ============= Training ============= #
     print('Construct training network')
@@ -103,7 +103,7 @@ for training_pair, validation_pair in\
     training_spiketrains = [[s for s in st] for st in training_pair[1]]
     C2_populations, compound_C2_population =\
             create_C2_populations(training_spiketrains)
-    out_p = sim.Population(1, sim.IF_curr_exp())
+    out_p = sim.Population(1, sim.IF_curr_exp(v_rest=-51))
     stdp = sim.STDPMechanism(weight=.4,
            timing_dependence=sim.SpikePairRule(tau_plus=5.0, tau_minus=5.0,
                                                A_plus=0.05, A_minus=0.03),
@@ -144,7 +144,7 @@ for training_pair, validation_pair in\
     validation_spiketrains = [[s for s in st] for st in validation_pair[1]]
     C2_populations, compound_C2_population =\
                                 create_C2_populations(validation_spiketrains)
-    classifier_neurons = [sim.Population(1, sim.IF_curr_exp())\
+    classifier_neurons = [sim.Population(1, sim.IF_curr_exp(v_rest=-51))\
                                 for cat in range(categories)]
     for category in range(categories):
         sim.Projection(compound_C2_population, classifier_neurons[category],
