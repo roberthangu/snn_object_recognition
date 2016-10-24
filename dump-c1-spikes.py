@@ -81,7 +81,7 @@ for size, layers in layer_collection['C1'].items():
                     'label': layer.population.label } for layer in layers]
     dataset_label += '_{}'.format(size)
 
-dumpname = 'C1_spike_data/{}.bin'.format(dataset_label)
+dumpname = 'C1_spikes/{}.bin'.format(dataset_label)
 print('Dumping spikes for all scales and layers to file', dumpname)
 dumpfile = open(dumpname, 'wb')
 pickle.dump(ddict, dumpfile, protocol=4)
