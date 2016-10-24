@@ -97,14 +97,11 @@ if args.plot_s2_spikes:
         if not s2_plots_dir_path.exists():
             s2_plots_dir_path.mkdir(parents=True)
 
-dumpfile_name = 'S2_weights/{}.bin'.format(dataset_label)
-out_dumpfile = open(dumpfile_name, 'wb')
-
 epoch_weights = [] # type: List[Tuple[int, List[Dict[str, np.array]]]]
 
 print('========= Start simulation =========')
 start_time = time.clock()
-for i in range(image_count):
+for i in range(10):
     print('Simulating for image number', i)
     sim.run(sim_time)
     if args.plot_c1_spikes:
@@ -142,6 +139,9 @@ cv2.imwrite('{}/{}_{:0>4}_images.png'.format(\
 # Also add the weights of the last iteration to the dumpfile
 if image_count % args.epoch_size != 0:
     epoch_weights.append((image_count, current_weights))
+
+dumpfile_name = 'S2_weights/{}.bin'.format(dataset_label)
+out_dumpfile = open(dumpfile_name, 'wb')
 print('Dumping weights for the selected epochs to file', dumpfile_name)
 pickle.dump(epoch_weights, out_dumpfile, protocol=4)
 out_dumpfile.close()
