@@ -40,7 +40,7 @@ layer_collection = {}
 print('Create S1 layers')
 t1 = time.clock()
 layer_collection['S1'] =\
-    nw.create_empty_input_layers_for_scales(imgs[0][1], args.scales)
+    nw.create_gabor_input_layers_for_scales(imgs[0][1], args.scales)
 nw.create_cross_layer_inhibition(layer_collection['S1'])
 print('S1 layer creation took {} s'.format(time.clock() - t1))
 
@@ -56,6 +56,9 @@ for layer_name in ['C1']:
         for layers in layer_collection[layer_name].values():
             for layer in layers:
                 layer.population.record('spikes')
+
+# Simulate for a certain time to allow the whole layer pipeline to "get filled"
+sim.run(40)
 
 print('========= Start simulation =========')
 start_time = time.clock()
