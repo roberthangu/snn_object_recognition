@@ -99,9 +99,12 @@ if args.plot_s2_spikes:
 
 epoch_weights = [] # type: List[Tuple[int, List[Dict[str, np.array]]]]
 
+# Let the simulation run to "fill" the layer pipeline with spikes
+sim.run(40)
+
 print('========= Start simulation =========')
 start_time = time.clock()
-for i in range(10):
+for i in range(image_count):
     print('Simulating for image number', i)
     sim.run(sim_time)
     if args.plot_c1_spikes:

@@ -10,7 +10,7 @@ import re
 
 import network as nw
 
-parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
+parser = ap.ArgumentParser()
 parser.add_argument('--training-c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains for\
                          training')
@@ -102,6 +102,8 @@ for epoch, weights_dict_list in epoch_weights_list:
 
     print('Setting C1 spike trains to the training dataset')
     set_c1_spiketrains(training_ddict)
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
     print('>>>>>>>>> Extracting spike trains for learning <<<<<<<<<')
     c2_training_spikes.append((epoch,
                   extract_spiketrains(training_image_count, training_sim_time)))
@@ -109,6 +111,8 @@ for epoch, weights_dict_list in epoch_weights_list:
 
     print('Setting C1 spike trains to the validation dataset')
     set_c1_spiketrains(validation_ddict)
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
     print('>>>>>>>>> Extracting spike trains for validation <<<<<<<<<')
     c2_validation_spikes.append((epoch,
               extract_spiketrains(validation_image_count, validation_sim_time)))

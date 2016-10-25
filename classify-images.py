@@ -89,6 +89,10 @@ def set_c1_spiketrains(ddict):
 training_labels = open(args.training_labels, 'r').read().splitlines()
 validation_labels = open(args.validation_labels, 'r').read().splitlines()
 
+def clear_data(C2_populations):
+    for pop in C2_populations:
+        pop.get_data(clear=True)
+
 def extract_data_samples(image_count):
     samples = []
     print('========= Start simulation =========')
@@ -99,8 +103,7 @@ def extract_data_samples(image_count):
             [list(layer_collection['C2'][prot].get_spike_counts().values())[0]\
                 for prot in range(s2_prototype_cells)]
         samples.append(spikes)
-        for prot in range(s2_prototype_cells):
-            layer_collection['C2'][prot].get_data(clear=True)
+        clear_data(layer_collection['C2'])
     print('========= Stop  simulation =========')
     return samples
 
@@ -113,21 +116,23 @@ for epoch, weights_dict_list in epoch_weights_list:
         nw.set_s2_weights(layer_collection['S2'], prototype,
                           weights_dict_list=weights_dict_list)
 
-    # TODO: Try to run this again with the S2 weights setting code also after
-    # the extraction of the training samples (seems not to make a difference)
-    # Also try to remove the inhibition between the S2 layers
-
     training_samples = []
     validation_samples = []
 
     print('Setting C1 spike trains to the training dataset')
     set_c1_spiketrains(training_ddict)
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
+    clear_data(layer_collection['C2'])
     print('>>>>>>>>> Extracting data samples for fitting <<<<<<<<<')
     training_samples = extract_data_samples(training_image_count)
     sim.reset()
 
     print('Setting C1 spike trains to the validation dataset')
     set_c1_spiketrains(validation_ddict)
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
+    clear_data(layer_collection['C2'])
     print('>>>>>>>>> Extracting data samples for validation <<<<<<<<<')
     validation_samples = extract_data_samples(validation_image_count)
     sim.reset()

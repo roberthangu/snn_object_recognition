@@ -116,8 +116,9 @@ for training_pair, validation_pair in\
     # Record the spikes for visualization purposes
     compound_C2_population.record('spikes')
     out_p.record(['spikes', 'v'])
-    #for pop in C2_populations:
-    #    pop.record('spikes')
+
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
 
     # Datastructure for storing the computed STDP weights for this epoch
     classifier_weights = [] # type: List[List[List[float]]]
@@ -155,6 +156,12 @@ for training_pair, validation_pair in\
     compound_C2_population.record('spikes')
     for pop in classifier_neurons:
         pop.record(['spikes', 'v'])
+
+    # Let the simulation run to "fill" the layer pipeline with spikes
+    sim.run(40)
+#   # TODO: uncomment these lines after the completion of the STDP tuning
+#    for pop in C2_populations:
+#        pop.get_data(clear=True)
 
     predicted_labels = []
     # Simulate and classify the images
