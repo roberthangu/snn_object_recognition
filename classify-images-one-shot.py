@@ -82,6 +82,7 @@ def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
         st = classifier_neurons[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
     mplt.subplot(313)
+    mplt.axis([0, t_sim_time, -66, -49])
     for i in range(len(classifier_neurons)):
         segm = classifier_neurons[i].get_data().segments[0]
         voltages = segm.filter(name='v')[0]
@@ -101,15 +102,19 @@ for training_pair, validation_pair in\
     C2_populations, compound_C2_population =\
             create_C2_populations(training_spiketrains)
     out_p = sim.Population(1, sim.IF_curr_exp(tau_refrac=3))
-    stdp_weight = .1
+    stdp_weight = 3 / s2_prototype_cells
+    print('Initial weights', stdp_weight)
     stdp = sim.STDPMechanism(weight=stdp_weight,
-           timing_dependence=sim.SpikePairRule(tau_plus=20.0, tau_minus=20.0,
-                                               A_plus=0.05, A_minus=0.03),
-           weight_dependence=sim.AdditiveWeightDependence(w_min=0.0, w_max=1.0))
+           timing_dependence=sim.SpikePairRule(tau_plus=10.0, tau_minus=10.0,
+                                               A_plus=stdp_weight / 4,
+                                               A_minus=stdp_weight / 4.1),
+           weight_dependence=sim.AdditiveWeightDependence(w_min=0.0,
+                                                          w_max=stdp_weight * 4))
     learn_proj = sim.Projection(compound_C2_population, out_p,
                                 sim.AllToAllConnector(), stdp)
 
     epoch = training_pair[0]
+    print('Simulating for epoch', epoch)
 
     # Record the spikes for visualization purposes
     compound_C2_population.record('spikes')
@@ -130,7 +135,8 @@ for training_pair, validation_pair in\
         print(classifier_weights[-1])
         learn_proj.set(weight=stdp_weight)
 
-    plot_spikes(C2_populations, [out_p], training_sim_time * training_image_count,
+    plot_spikes(C2_populations, [out_p],
+                training_sim_time * training_image_count + 40,
                 'training')
 
     sim.end()
@@ -178,7 +184,8 @@ for training_pair, validation_pair in\
 #        for clf_n in classifier_neurons:
 #            clf_n.get_data(clear=True)
 
-    plot_spikes(C2_populations, classifier_neurons, 4 * validation_sim_time,
+    plot_spikes(C2_populations,
+                classifier_neurons, 4 * validation_sim_time + 40,
                 'validation')
 
 #    print('============================================================',
