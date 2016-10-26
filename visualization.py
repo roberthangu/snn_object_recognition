@@ -314,7 +314,7 @@ def plot_S2_spikes(S2_layers: Dict[float, Sequence[nw.Layer]], image_name: str,
         spike_panels = []
         for size, layer_list in S2_layers.items():
             layer = layer_list[i]
-            out_data = layer.population.get_data(clear=True).segments[0]
+            out_data = layer.population.get_data().segments[0]
             spike_panels.append(plt.Panel(out_data.spiketrains,
                               xticks=True, yticks=True,
               xlabel='{}, scale {}, prototype {}'.format(image_name, size, i)))
@@ -346,6 +346,7 @@ def plot_C2_spikes(C2_populations, it, sim_time, plot_name,
     mplt.rcParams.update(fig_settings)
     mplt.figure(figsize=(10, 6))
     start_time = it * sim_time
+    mplt.subplot(211)
     mplt.axis([start_time, start_time + sim_time, -.2, len(C2_populations) - .8])
     mplt.xlabel('Time (ms)')
     mplt.ylabel('Neuron index')
@@ -353,5 +354,10 @@ def plot_C2_spikes(C2_populations, it, sim_time, plot_name,
     for i in range(len(C2_populations)):
         st = C2_populations[i].get_data().segments[0].spiketrains[0]
         mplt.plot(st, np.ones_like(st) * i, '.')
+    mplt.subplot(212)
+    mplt.axis([start_time, start_time + sim_time, -66, -49])
+    for i in range(len(C2_populations)):
+        v = C2_populations[i].get_data().segments[0].filter(name='v')[0]
+        mplt.plot(v.times, v, label=str(i))
 
     mplt.savefig('{}/{}.png'.format(out_dir_name, plot_name))

@@ -653,8 +653,8 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                            ndicts=ndicts, ondicts=ondicts,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
-    if not stdp:
-        return S2_layers
+#    if not stdp:
+#        return S2_layers
     # Set the labels of the shared connections
     t = time.clock()
     print('Set shared labels')
@@ -827,6 +827,8 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
         A list of populations of size one, one population for each prototype
         cell
     """
+    no_inh_w = 17.15            # synapse weight without S2 inhibitions
+    with_inh_w = 4 * no_inh_w   # synapse weight with S2 inhibitions
     C2_populations = [sim.Population(1, sim.IF_curr_exp(),
                                      label=str(prot))\
                         for prot in range(s2_prototype_cells)]
@@ -836,5 +838,5 @@ def create_C2_layers(S2_layers: Dict[float, Sequence[Layer]],
         for prot in range(s2_prototype_cells):
             sim.Projection(s2ll[prot].population, C2_populations[prot],
                            sim.AllToAllConnector(),
-                           sim.StaticSynapse(weight=17.15 / total_connections))
+                           sim.StaticSynapse(weight=with_inh_w / total_connections))
     return C2_populations
