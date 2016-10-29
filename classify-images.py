@@ -41,6 +41,10 @@ training_image_count = int(re.search('\d*imgs',
 validation_image_count = int(re.search('\d*imgs',
                                        validation_dumpfile_name).group()[:-4])
 sim_time = float(re.search('\d+\.\d+ms', validation_dumpfile_name).group()[:-2])
+blanktime = 0
+occurrence = re.search('\d+\.\d+blank', training_dumpfile_name)
+if occurrence is not None:
+    blanktime = float(occurrence.group()[:-5])
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -98,7 +102,7 @@ def extract_data_samples(image_count):
     print('========= Start simulation =========')
     for i in range(image_count):
         print('Simulating for image number', i)
-        sim.run(sim_time)
+        sim.run(sim_time + blanktime)
         spikes =\
             [list(layer_collection['C2'][prot].get_spike_counts().values())[0]\
                 for prot in range(s2_prototype_cells)]
