@@ -406,6 +406,18 @@ def set_i_offsets_for_all_scales_to(layers_dict: Dict[float, Sequence[Layer]],
         for layer in layers:
             set_i_offsets(layer, filtered_imgs_dict[layer.population.label])
 
+def set_blank_i_offsets(layers_dict: Dict[float, Sequence[Layer]]) -> None:
+    """
+    Sets the i_offsets of the given layers to zero.
+
+    Parameters:
+        `layers_dict`: A dictionary containing for each size a list of layers,
+                       for each gabor filter orientation one.
+    """
+    for layers in layers_dict.values():
+        for layer in layers:
+            layer.population.set(i_offset=0)
+
 def create_empty_input_layers_for_scales(target: np.array, scales: [float])\
         -> Dict[float, List[Layer]]:
     """

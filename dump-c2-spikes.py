@@ -37,6 +37,10 @@ training_sim_time = float(re.search('\d+\.\d+ms',
                                         training_dumpfile_name).group()[:-2])
 validation_sim_time = float(re.search('\d+\.\d+ms',
                                         validation_dumpfile_name).group()[:-2])
+blanktime = 0
+occurrence = re.search('\d+\.\d+blank', training_dumpfile_name)
+if occurrence is not None:
+    blanktime = float(occurrence.group()[:-5])
 
 print('Create C1 layers')
 t1 = time.clock()
@@ -85,7 +89,7 @@ def set_c1_spiketrains(ddict):
 def extract_spiketrains(image_count, sim_time):
     print('========= Start simulation =========')
     print('Simulating for', image_count, 'images')
-    sim.run(sim_time * image_count)
+    sim.run(sim_time * image_count + blanktime)
     print('========= Stop  simulation =========')
     return [layer_collection['C2'][prot].get_data(clear=True).segments[0]\
                 .spiketrains[0] for prot in range(s2_prototype_cells)]
