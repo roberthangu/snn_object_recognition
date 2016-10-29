@@ -688,16 +688,17 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                    sim.AllToAllConnector(),
                                    sim.StaticSynapse(weight=inh_weight,
                                                      delay=inh_delay))
-    # Create the inhibition between different prototype layers
-    print('Create S2 cross-prototype inhibitory connections')
-    for layer_list in S2_layers.values():
-        for layer1 in layer_list:
-            for layer2 in layer_list:
-                if layer1 != layer2:
-                    sim.Projection(layer1.population, layer2.population,
-                                   sim.OneToOneConnector(),
-                                   sim.StaticSynapse(weight=inh_weight-1,
-                                                     delay=inh_delay))
+    if stdp:
+        # Create the inhibition between different prototype layers
+        print('Create S2 cross-prototype inhibitory connections')
+        for layer_list in S2_layers.values():
+            for layer1 in layer_list:
+                for layer2 in layer_list:
+                    if layer1 != layer2:
+                        sim.Projection(layer1.population, layer2.population,
+                                       sim.OneToOneConnector(),
+                                       sim.StaticSynapse(weight=inh_weight-1,
+                                                         delay=inh_delay))
     return S2_layers
 
 def set_s2_weights(S2_layers: Dict[float, Sequence[Layer]], prototype: int,
