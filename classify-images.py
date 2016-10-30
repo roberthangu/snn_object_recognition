@@ -45,6 +45,9 @@ blanktime = 0
 occurrence = re.search('\d+\.\d+blank', training_dumpfile_name)
 if occurrence is not None:
     blanktime = float(occurrence.group()[:-5])
+occurrence = re.search('\d+\.\d+blank', validation_dumpfile_name)
+if occurrence is not None:
+    blanktime = float(occurrence.group()[:-5])
 
 print('Create C1 layers')
 t1 = time.clock()
