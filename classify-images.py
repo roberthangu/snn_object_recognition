@@ -73,7 +73,7 @@ f_s = int(np.sqrt(list(weights_dict_list[0].values())[0].shape[0]))
 s2_prototype_cells = len(weights_dict_list)
 layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], f_s,
                                              s2_prototype_cells, refrac_s2=.1,
-                                             stdp=False)
+                                             stdp=False, inhibition=False)
 
 print('Creating C2 layers')
 t1 = time.clock()

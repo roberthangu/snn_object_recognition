@@ -88,7 +88,7 @@ for size, layers in layer_collection['C1'].items():
                     'shape': layer.shape,
                     'label': layer.population.label } for layer in layers]
     dataset_label += '_{}'.format(size)
-dataset_label += '_{}blank'.format(args.blanktime)
+dataset_label += '_{}blank'.format(float(args.blanktime))
 
 dumpname = 'C1_spikes/{}.bin'.format(dataset_label)
 print('Dumping spikes for all scales and layers to file', dumpname)

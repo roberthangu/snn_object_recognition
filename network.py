@@ -607,7 +607,8 @@ def initialize_label_dicts(s2_prototype_cells: int, f_s: int)\
     return s2_label_dicts
 
 def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
-                     s2_prototype_cells, refrac_s2=.1, stdp=True)\
+                     s2_prototype_cells, refrac_s2=.1, stdp=True,
+                     inhibition=True)\
         -> Dict[float, List[Layer]]:
     """
     Creates all prototype S2 layers for all sizes.
@@ -665,8 +666,6 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                            ndicts=ndicts, ondicts=ondicts,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
-#    if not stdp:
-#        return S2_layers
     # Set the labels of the shared connections
     t = time.clock()
     print('Set shared labels')
@@ -678,28 +677,29 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                 nest.SetStatus(conns, {'label': label,
                                       'weight': w_iter.__next__()})
     print('Setting labels took', time.clock() - t)
-    # Create inhibitory connections between the S2 cells
-    # First between the neurons of the same layer...
-    inh_weight = -10
-    inh_delay = .1
-    print('Create S2 self inhibitory connections')
-    for layer_list in S2_layers.values():
-        for layer in layer_list:
-            sim.Projection(layer.population, layer.population,
-                           sim.AllToAllConnector(allow_self_connections=False),
-                           sim.StaticSynapse(weight=inh_weight,
-                                             delay=inh_delay))
-    # ...and between the layers
-    print('Create S2 cross-scale inhibitory connections')
-    for i in range(s2_prototype_cells):
-        for layer_list1 in S2_layers.values():
-            for layer_list2 in S2_layers.values():
-                if layer_list1[i] != layer_list2[i]:
-                    sim.Projection(layer_list1[i].population,
-                                   layer_list2[i].population,
-                                   sim.AllToAllConnector(),
-                                   sim.StaticSynapse(weight=inh_weight,
-                                                     delay=inh_delay))
+    if inhibition:
+        # Create inhibitory connections between the S2 cells
+        # First between the neurons of the same layer...
+        inh_weight = -10
+        inh_delay = .1
+        print('Create S2 self inhibitory connections')
+        for layer_list in S2_layers.values():
+            for layer in layer_list:
+                sim.Projection(layer.population, layer.population,
+                               sim.AllToAllConnector(allow_self_connections=False),
+                               sim.StaticSynapse(weight=inh_weight,
+                                                 delay=inh_delay))
+        # ...and between the layers
+        print('Create S2 cross-scale inhibitory connections')
+        for i in range(s2_prototype_cells):
+            for layer_list1 in S2_layers.values():
+                for layer_list2 in S2_layers.values():
+                    if layer_list1[i] != layer_list2[i]:
+                        sim.Projection(layer_list1[i].population,
+                                       layer_list2[i].population,
+                                       sim.AllToAllConnector(),
+                                       sim.StaticSynapse(weight=inh_weight,
+                                                         delay=inh_delay))
     if stdp:
         # Create the inhibition between different prototype layers
         print('Create S2 cross-prototype inhibitory connections')

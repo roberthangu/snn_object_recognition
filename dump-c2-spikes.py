@@ -66,7 +66,7 @@ f_s = int(np.sqrt(list(weights_dict_list[0].values())[0].shape[0]))
 s2_prototype_cells = len(weights_dict_list)
 layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'], f_s,
                                              s2_prototype_cells, refrac_s2=.1,
-                                             stdp=False)
+                                             stdp=False, inhibition=True)
 
 print('Creating C2 layers')
 t1 = time.clock()
@@ -89,7 +89,7 @@ def set_c1_spiketrains(ddict):
 def extract_spiketrains(image_count, sim_time):
     print('========= Start simulation =========')
     print('Simulating for', image_count, 'images')
-    sim.run(sim_time * image_count + blanktime)
+    sim.run((sim_time + blanktime) * image_count)
     print('========= Stop  simulation =========')
     return [layer_collection['C2'][prot].get_data(clear=True).segments[0]\
                 .spiketrains[0] for prot in range(s2_prototype_cells)]
