@@ -76,12 +76,12 @@ layer_collection['S2'] = nw.create_S2_layers(layer_collection['C1'],
                                              refrac_s2=6)
 print('S2 creation took {} s'.format(time.clock() - t1))
 
-for layers in layer_collection['C1'].values():
-    for layer in layers:
-        layer.population.record('spikes')
-for layer_list in layer_collection['S2'].values():
-    for layer in layer_list:
-        layer.population.record(['spikes', 'v'])
+#for layers in layer_collection['C1'].values():
+#    for layer in layers:
+#        layer.population.record('spikes')
+#for layer_list in layer_collection['S2'].values():
+#    for layer in layer_list:
+#        layer.population.record(['spikes', 'v'])
 
 reconstructions_dir_dataset_path = plb.Path('S2_reconstructions/' + dataset_label)
 if not reconstructions_dir_dataset_path.exists():
