@@ -667,15 +667,16 @@ def create_S2_layers(C1_layers: Dict[float, Sequence[Layer]], feature_size,
                                            omdicts=omdicts)
         S2_layers[size] = layer_list
     # Set the labels of the shared connections
-    t = time.clock()
-    print('Set shared labels')
-    for s2_label_dicts in [ndicts, ondicts, omdicts]:
-        for i in range(s2_prototype_cells):
-            w_iter = weights.__iter__()
-            for label, (source, target) in s2_label_dicts[i].items():
-                conns = nest.GetConnections(source=source, target=target)
-                nest.SetStatus(conns, {'label': label,
-                                      'weight': w_iter.__next__()})
+    if stdp:
+        t = time.clock()
+        print('Set shared labels')
+        for s2_label_dicts in [ndicts, ondicts, omdicts]:
+            for i in range(s2_prototype_cells):
+                w_iter = weights.__iter__()
+                for label, (source, target) in s2_label_dicts[i].items():
+                    conns = nest.GetConnections(source=source, target=target)
+                    nest.SetStatus(conns, {'label': label,
+                                          'weight': w_iter.__next__()})
     print('Setting labels took', time.clock() - t)
     if inhibition:
         # Create inhibitory connections between the S2 cells
