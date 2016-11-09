@@ -5,6 +5,7 @@ import argparse as ap
 import re
 import matplotlib.pyplot as mplt
 import pyNN.nest as sim
+import statistics as st
 from sklearn import metrics
 
 parser = ap.ArgumentParser()
@@ -36,6 +37,10 @@ validation_sim_time = float(re.search('\d+\.\d+ms',
                                         validation_dumpfile_name).group()[:-2])
 imgs_per_category = int(re.search('\d+learn',
                                         training_dumpfile_name).group()[:-5])
+blanktime = 0
+occurrence = re.search('\d+\.\d+blank', training_dumpfile_name)
+if occurrence is not None:
+    blanktime = float(occurrence.group()[:-5])
 categories = training_image_count // imgs_per_category
 
 # Read the training and validation labels from file
@@ -60,7 +65,6 @@ def create_C2_populations(spiketrains):
 results_label = '{}_{}valimgs_{}valsimtime'\
                     .format(training_dumpfile_name, validation_image_count,
                             validation_sim_time)
-logfile = open('log/{}.log'.format(results_label), 'w')
 
 def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
     fig_settings = {
@@ -70,8 +74,9 @@ def plot_spikes(C2_populations, classifier_neurons, t_sim_time, appendix):
         'legend.fontsize': 'small',
     }
     mplt.rcParams.update(fig_settings)
-    mplt.figure(figsize=(10, 10))
+    mplt.figure(figsize=(13, 10))
     mplt.subplot(311)
+    mplt.grid(True)
     mplt.axis([0, t_sim_time, -.2, len(C2_populations) - .8])
     for i in range(len(C2_populations)):
         st = C2_populations[i].get_data().segments[0].spiketrains[0]
@@ -101,43 +106,54 @@ for training_pair, validation_pair in\
     training_spiketrains = [[s for s in st] for st in training_pair[1]]
     C2_populations, compound_C2_population =\
             create_C2_populations(training_spiketrains)
-    out_p = sim.Population(1, sim.IF_curr_exp(tau_refrac=3))
-    stdp_weight = 3 / s2_prototype_cells
-    print('Initial weights', stdp_weight)
+    out_p = sim.Population(1, sim.IF_curr_exp(tau_refrac=.1))
+    stdp_weight = 7 / s2_prototype_cells
     stdp = sim.STDPMechanism(weight=stdp_weight,
-           timing_dependence=sim.SpikePairRule(tau_plus=10.0, tau_minus=10.0,
-                                               A_plus=stdp_weight / 4,
-                                               A_minus=stdp_weight / 4.1),
+           timing_dependence=sim.SpikePairRule(tau_plus=20.0, tau_minus=26.0,
+                                               A_plus=stdp_weight / 5,
+                                               A_minus=stdp_weight / 4.48),
            weight_dependence=sim.AdditiveWeightDependence(w_min=0.0,
-                                                          w_max=stdp_weight * 4))
+                                                      w_max=15.8 * stdp_weight))
     learn_proj = sim.Projection(compound_C2_population, out_p,
                                 sim.AllToAllConnector(), stdp)
 
     epoch = training_pair[0]
     print('Simulating for epoch', epoch)
 
-    # Record the spikes for visualization purposes
-    compound_C2_population.record('spikes')
+    # Record the spikes for visualization purposes and to count the number of
+    # fired spikes
+#    compound_C2_population.record('spikes')
     out_p.record(['spikes', 'v'])
 
     # Let the simulation run to "fill" the layer pipeline with spikes
     sim.run(40)
 
     # Datastructure for storing the computed STDP weights for this epoch
-    classifier_weights = [] # type: List[List[List[float]]]
+    classifier_weights = []
     
     # Training STDP weights for every category and save them to classifier_weights
+    old_spike_counts = 0
+    max_spikes = 18
     for category in range(categories):
         print('Train weights for', training_labels[category])
-        sim.run(training_sim_time * imgs_per_category)
+        max_simtime = training_sim_time + blanktime
+        segm_time = 10
+        total_time = 0
+        while total_time < max_simtime\
+                    and list(out_p.get_spike_counts().values())[0]\
+                        - old_spike_counts < max_spikes:
+            sim.run(segm_time)
+            total_time += segm_time
+        old_spike_counts = list(out_p.get_spike_counts().values())[0]
         classifier_weights.append(learn_proj.get('weight', 'array'))
-        print('weights')
-        print(classifier_weights[-1])
+        learn_proj.set(weight=0)
+        sim.run(max_simtime - total_time)
         learn_proj.set(weight=stdp_weight)
 
-    plot_spikes(C2_populations, [out_p],
-                training_sim_time * training_image_count + 40,
-                'training')
+#    plot_spikes(C2_populations, [out_p],
+#                (training_sim_time + blanktime) * training_image_count + 40,
+#                simtime + blanktime,
+#                'training')
 
     sim.end()
 
@@ -152,6 +168,7 @@ for training_pair, validation_pair in\
     classifier_neurons = [sim.Population(1, sim.IF_curr_exp())\
                                 for cat in range(categories)]
     for category in range(categories):
+#    for category in range(1):
         sim.Projection(compound_C2_population, classifier_neurons[category],
                        sim.AllToAllConnector(),
                        sim.StaticSynapse(weight=classifier_weights[category]))
@@ -163,46 +180,45 @@ for training_pair, validation_pair in\
 
     # Let the simulation run to "fill" the layer pipeline with spikes
     sim.run(40)
-#   # TODO: uncomment these lines after the completion of the STDP tuning
-#    for pop in C2_populations:
-#        pop.get_data(clear=True)
+
+    for pop in C2_populations:
+        pop.get_data(clear=True)
 
     predicted_labels = []
     # Simulate and classify the images
-#    for i in range(validation_image_count):
-    for i in range(4):
+    for i in range(validation_image_count):
         print('Simulating for image', i)
-        sim.run(validation_sim_time)
+        sim.run(validation_sim_time + blanktime)
         # Find the neuron which fired most
-        # TODO: after taking the max, clear the recorded spikes with
-        #       get_data(clear=True)
         label, count = max(zip(training_labels,
                        map(lambda pop: list(pop.get_spike_counts().values())[0],
                            classifier_neurons)), key=lambda pair: pair[1])
-        print('label', label, 'count', count)
-#        predicted_labels.append(label)
-#        for clf_n in classifier_neurons:
-#            clf_n.get_data(clear=True)
+        predicted_labels.append(label)
+        for clf_n in classifier_neurons:
+            clf_n.get_data(clear=True)
 
-    plot_spikes(C2_populations,
-                classifier_neurons, 4 * validation_sim_time + 40,
-                'validation')
+#    plot_spikes(C2_populations,
+#                classifier_neurons,
+#                (validation_sim_time + blanktime) * num_images + 40,
+#                'validation')
 
-#    print('============================================================',
-#          file=logfile)
-#    print('Epoch', epoch, file=logfile)
-#    clf_report = metrics.classification_report(validation_labels, predicted_labels)
-#    conf_matrix = metrics.confusion_matrix(validation_labels, predicted_labels)
-#    print(clf_report, file=logfile)
-#    print(clf_report)
-#    print(conf_matrix, file=logfile)
-#    print(conf_matrix)
-#
-#    all_epochs_weights.append((epoch, classifier_weights))
+    logfile = open('log/{}.log'.format(results_label), 'a')
+    print('============================================================',
+          file=logfile)
+    print('Epoch', epoch, file=logfile)
+    clf_report = metrics.classification_report(validation_labels, predicted_labels)
+    conf_matrix = metrics.confusion_matrix(validation_labels, predicted_labels)
+    print(clf_report, file=logfile)
+    print(clf_report)
+    print(conf_matrix, file=logfile)
+    print(conf_matrix)
+    
+    logfile.close()
+    all_epochs_weights.append((epoch, classifier_weights))
     sim.end()
 
-#print('Wrote log to file', logfile.name())
-#clf_dumpname = 'CLF_weights/{}.bin'.format(results_label)
-#clf_dumpfile = open(clf_dumpname, 'wb', protocol=4)
-#print('Dumping classificator weights to file', clf_dumpname)
-#pickle.dump(all_epochs_weights, clf_dumpfile)
+print('Wrote log to file', logfile.name())
+clf_dumpname = 'CLF_weights/{}.bin'.format(results_label)
+clf_dumpfile = open(clf_dumpname, 'wb', protocol=4)
+print('Dumping classificator weights to file', clf_dumpname)
+pickle.dump(all_epochs_weights, clf_dumpfile)
