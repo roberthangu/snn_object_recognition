@@ -114,7 +114,12 @@ def extract_data_samples(image_count):
     print('========= Stop  simulation =========')
     return samples
 
-logfile = open('log/{}.log'.format(plb.Path(args.weights_from).stem), 'w')
+#### Temporary reduction to every third epoch! #############
+epoch_weights_list = [index_pair[1] for index_pair in\
+                        filter(lambda index_pair: index_pair[0] % 3 == 0,
+                            zip(range(len(epoch_weights_list)),
+                                epoch_weights_list))]
+############################################################
 
 for epoch, weights_dict_list in epoch_weights_list:
     # Set the S2 weights to those from the file
@@ -149,6 +154,8 @@ for epoch, weights_dict_list in epoch_weights_list:
     clf = svm.SVC(kernel='linear')
     clf.fit(training_samples, training_labels)
 
+    logfile = open('log_final/{}.log'.format(plb.Path(args.weights_from).stem), 'a')
+
     print('Predicting the categories of the validation samples')
     predicted_labels = clf.predict(validation_samples)
     print('============================================================',
@@ -160,5 +167,7 @@ for epoch, weights_dict_list in epoch_weights_list:
     print(clf_report)
     print(conf_matrix, file=logfile)
     print(conf_matrix)
+
+    logfile.close()
 
 sim.end()
