@@ -4,17 +4,18 @@ import cv2
 import sys
 import pyNN.nest as sim
 import pathlib as plb
-import pyNN.utility.plotting as plt
+import time
 
 import common as cm
 import network as nw
 import visualization as vis
-
-# TODO: - Filter input images with a Canny filter
+import time
 
 args = cm.parse_args()
 
+t1 = time.clock()
 weights_dict, feature_imgs_dict = nw.train_weights(args.feature_dir)
+print('Training weights took {} s'.format(time.clock() - t1))
 
 if args.plot_weights:
     vis.plot_weights(weights_dict)
@@ -23,82 +24,67 @@ if args.plot_weights:
 # The training part is done. Go on with the "actual" simulation
 sim.setup(threads=4)
 
-target_img = cv2.imread(args.target_name, cv2.CV_8U)
-layer_collection = {}
-input_scales = [1, 0.71, 0.5, 0.35, 0.25]
-layer_collection['S1'] = nw.create_S1_layers(target_img, weights_dict,
-                                             input_scales,
-                                             args)
+target_img = cm.read_and_prepare_img(args.target_name, args.filter)
+if args.filter != 'none':
+    filename = 'edges/{}_{}_edges.png'.format(plb.Path(args.target_name).stem,
+                                              args.filter)
+    if not plb.Path(filename).exists():
+        cv2.imwrite(filename, target_img)
+
+layer_collection = {} # layer name -> dict of S1 layers of type
+                      # 'scale -> layer list'
+layer_collection['input'] = nw.create_input_layers_for_scales(target_img,
+                                                             args.scales)
+t1 = time.clock()
+layer_collection['S1'] = nw.create_S1_layers(layer_collection['input'],
+                                             weights_dict, args)
+nw.create_cross_layer_inhibition(layer_collection['S1'])
+print('S1 creation took {} s'.format(time.clock() - t1))
+
 if not args.no_c1:
-    layer_collection['C1'] = nw.create_C1_layers(S1_layers, args.refrac_c1)
+    t1 = time.clock()
+    print('Create C1 layers')
+    layer_collection['C1'] = nw.create_C1_layers(layer_collection['S1'],
+                                                 args.refrac_c1)
+    nw.create_local_inhibition(layer_collection['C1'])
+    print('C1 creation took {} s'.format(time.clock() - t1))
 
-
-for layer_dict in layer_collection.values():
-    for layers in layer_dict.values():
-        for layer in layers:
-            layer.population.record('spikes')
+for layer_name in ['S1', 'C1']:
+    if layer_name in layer_collection:
+        for layers in layer_collection[layer_name].values():
+            for layer in layers:
+                layer.population.record('spikes')
 
 print('========= Start simulation =========')
-sim.run(300)
+start_time = time.clock()
+sim.run(args.sim_time)
+end_time = time.clock()
 print('========= Stop  simulation =========')
+print('Simulation took', end_time - start_time, 's')
 
+for layer_name in ['S1', 'C1']:
+    if layer_name in layer_collection:
+        for layers in layer_collection[layer_name].values():
+            for layer in layers:
+                layer.update_spike_counts()
+
+t1 = time.clock()
 if args.reconstruct_s1_img:
-    vis_img = np.zeros(target_img.shape)
-    vis_parts = vis.visualization_parts(target_img.shape,
-                                        layer_collection['S1'],
-                                        feature_imgs_dict,
-                                        args.delta_i, args.delta_j)
-    for size, img_pairs in vis_parts.items():
-        for img, feature_label in img_pairs:
-            vis_img += img
-    cv2.imwrite('{}_S1_reconstruction.png'.format(plb.Path(args.target_name).stem),
-                                               vis_img)
+    vis.reconstruct_S1_features(target_img, layer_collection, feature_imgs_dict,
+                                args)
+    print('S1 visualization took {} s'.format(time.clock() - t1))
 
-if args.reconstruct_c1_img:
-    # Create the RGB canvas to draw colored rectangles for the features
-    canvas = cv2.cvtColor(target_img, cv2.COLOR_GRAY2RGB)
-    # Create the colored squares for the features in a map
-    colored_squares_dict = {} # feature name -> colored square
-    # A set of predefined colors
-    colors = {'red': (255, 0, 0),
-              'green': (0, 255, 0),
-              'blue': (0, 0, 255),
-              'yellow': (255, 255, 0),
-              'purple': (255, 0, 255)}
-    color_iterator = colors.__iter__()
-    for feature_name, feature_img in feature_imgs_dict.items():
-        color_name = color_iterator.__next__()
-        f_n, f_m = feature_img.shape
-        bf_n = 6 * args.delta_i + f_m   # "big" f_n
-        bf_m = 6 * args.delta_j + f_m   # "big" f_m
-        # Create a square to cover all pixels of a C1 neuron
-        square = np.zeros((bf_n, bf_m, 3))
-        cv2.rectangle(square, (0, 0), (bf_n - 1, bf_m - 1), colors[color_name])
-        print('feature name and color: ', feature_name, color_name)
-        colored_squares_dict[feature_name] = square
-    vis_parts = visualization_parts(target_img.shape, C1_layers,
-                                              colored_squares_dict,
-                                              6 * args.delta_i,
-                                              6 * args.delta_j, canvas)
-    for size, img_pairs in vis_parts.items():
-        for img, feature_label in img_pairs:
-            cv2.imwrite('reconstruction_components/{}_{}_C1_{}_reconstruction.png'.\
-                        format(feature_label, size, plb.Path(args.target_name).stem),
-                        img)
+t1 = time.clock()
+if args.reconstruct_c1_img and not args.no_c1:
+    vis.reconstruct_C1_features(target_img, layer_collection, feature_imgs_dict,
+                                args)
+    print('C1 visualization took {} s'.format(time.clock() - t1))
 
-# Plot the spike trains of both neuron layers
-for layer_name, layer_dict in layer_collection.items():
-    for size, layers in layer_dict.items():
-        spike_panels = []
-        for layer in layers:
-            out_data = layer.population.get_data().segments[0]
-            spike_panels.append(plt.Panel(out_data.spiketrains,# xlabel='Time (ms)',
-                                          xticks=True, yticks=True,
-                                          xlabel='{}, {} scale layer'.format(\
-                                                    layer.population.label, size)))
-        plt.Figure(*spike_panels).save('plots/{}_{}_{}_scale.png'.format(\
-                                                layer_name,
-                                                plb.Path(args.target_name).stem,
-                                                size))
+
+t1 = time.clock()
+if args.plot_spikes:
+    print('Plotting spikes')
+    vis.plot_spikes(layer_collection, args)
+    print('Plotting spiketrains took {} s'.format(time.clock() - t1))
 
 sim.end()
