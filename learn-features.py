@@ -34,7 +34,7 @@ import network as nw
 import visualization as vis
 import time
 
-parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
+parser = ap.ArgumentParser('./learn-features.py --')
 parser.add_argument('--c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains')
 parser.add_argument('--epoch-size', type=int, default=30,

@@ -31,7 +31,7 @@ from sklearn import svm, metrics
 import network as nw
 import visualization as vis
 
-parser = ap.ArgumentParser('./c1-spikes-from-file-test.py --')
+parser = ap.ArgumentParser('./classify-images.py --')
 parser.add_argument('--training-c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains for\
                          training')

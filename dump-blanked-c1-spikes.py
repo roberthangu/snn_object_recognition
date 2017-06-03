@@ -31,7 +31,7 @@ import argparse as ap
 import network as nw
 import visualization as vis
 
-parser = ap.ArgumentParser('./dump-c1-spikes.py --')
+parser = ap.ArgumentParser('./dump-blanked-c1-spikes.py --')
 parser.add_argument('--blanktime', type=float, default=120,
                     help='The blank time between the image spikes. Defaults to\
                     120 ms')

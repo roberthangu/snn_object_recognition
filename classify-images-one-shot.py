@@ -28,7 +28,7 @@ import pyNN.nest as sim
 import statistics as st
 from sklearn import metrics
 
-parser = ap.ArgumentParser()
+parser = ap.ArgumentParser('./classify-images-one-shot.py --')
 parser.add_argument('--training-c2-dumpfile', type=str, required=True,
                     help='The output file to contain the C2 spiketrains for\
                          training')

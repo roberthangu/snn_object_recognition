@@ -30,7 +30,7 @@ import re
 
 import network as nw
 
-parser = ap.ArgumentParser()
+parser = ap.ArgumentParser('./dump-c2-spikes.py --')
 parser.add_argument('--training-c1-dumpfile', type=str, required=True,
                     help='The output file to contain the C1 spiketrains for\
                          training')
