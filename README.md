@@ -117,10 +117,10 @@ defaults.
 
 ## Installation ##
 
-**NOTE:** At the moment the network relies on a custom-built NEST implementation 
-which adds a shared-weights synapse type. This mechanism greatly speeds up the 
-computation, since weight changes to one synapse no longer need to be copied to 
-all the others, but is read from a single shared table.
+**NOTE:** At the moment the network relies on a NEST extension which adds a 
+shared-weights synapse type. This mechanism greatly speeds up the computation, 
+since weight changes to one synapse no longer need to be copied to all the 
+others, but is read from a single shared table.
 
 In order to run the code, the user needs to install 
 [NEST](http://nest-simulator.org/) with 
