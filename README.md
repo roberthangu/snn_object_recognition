@@ -52,17 +52,17 @@ information again when tuning or testing a certain layer.
 
 For this purpose there are three scripts:
 
-* **`dump-c1-spikes.py`** or **`dump-blanked-c1-spikes.py`**:
+* `dump-c1-spikes.py` or `dump-blanked-c1-spikes.py`:
   Runs from input image to the C1 layer. The output is the C1 spiketrains. The
   second script adds a blanktime between each consecutive images. This is
   beneficial for the recognition later.
-* **`learn-features.py`**: Simulate the C1 - S2 layers. This is the place where the
+* `learn-features.py`: Simulate the C1 - S2 layers. This is the place where the
   S2 weights are learned, i.e. the "features", and are dumped to file,
   from which they can be later used for classification. The filename is
   automatically generated from the given command line parameters and the name of
   the C1 spike dumpfile.
-* **`dump-c2-spikes.py`**: C1 to the C2 layer
-* **`classify-images.py`** or **`classify-images-one-shot.py`**: These scripts use the
+* `dump-c2-spikes.py`: C1 to the C2 layer
+* `classify-images.py` or `classify-images-one-shot.py`: These scripts use the
   weights learned previously to learn new object classes images in a one-shot manner. The 
   first script uses a SVM for the classification of the images and does not rely
   on the dumped C2 spikes. The second script does "real" one-shot classification
