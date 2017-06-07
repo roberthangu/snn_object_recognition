@@ -17,11 +17,9 @@ the C1 - S2 layers using Spike-Timing-Dependent Plasticity (STDP). This
 architecture is inspired by the work of [Masquelier et al.][masq] Some sample 
 features learned by the network can be seen below.
 
-+-----------------------+-----------------------+-----------------------+-----------------------+
-| ![](samples/mo_1.png) | ![](samples/mo_2.png) | ![](samples/mo_3.png) | ![](samples/mo_4.png) |
-+-----------------------+-----------------------+-----------------------+-----------------------+
-| ![](samples/fa_1.png) | ![](samples/fa_2.png) | ![](samples/fa_3.png) | ![](samples/fa_4.png) |
-+-----------------------+-----------------------+-----------------------+-----------------------+
+![](samples/mo_1.png) ![](samples/mo_2.png) ![](samples/mo_3.png) ![](samples/mo_4.png)
+
+![](samples/fa_1.png) ![](samples/fa_2.png) ![](samples/fa_3.png) ![](samples/fa_4.png)
 
 Table: Features extracted from motorbikes (top) and faces (bottom)
 
@@ -79,7 +77,7 @@ defaults.
 
 1. To dump the C1 spiketrains with a blanktime between consecutive images:
 
-    ```bash
+    ```
     ./dump-blanked-c1-spikes.py --
         --dataset-label <your label>
         --training-dir <training images>
@@ -88,7 +86,7 @@ defaults.
 2. Train the C1 - S2 weights (i.e. extract the features). The filename of the
    weights dumpfile is automatically generated:
 
-    ```bash
+    ```
     ./learn-features.py --
         --c1-dumpfile <c1 spiketrain dumpfile> 
     ```
@@ -96,7 +94,7 @@ defaults.
 3. [Optional. Used for accelerating the STDP learning in the one-shot classifier]
    Dump the C2 spiketrains:
 
-    ```bash
+    ```
     ./dump-c2-spikes.py --
         --training-c1-dumpfile <c1 spiketrain dumpfile>
         --weights-from <S2 weigths dumpfile from step 2>
@@ -105,7 +103,7 @@ defaults.
 4. Learn and classify new classes by using the weights of step 2 either with an
    SVM (first script) or with a fully connected end-layer using STDP:
 
-    ```bash
+    ```
     ./classify-images.py --
        --training-c2-dumpfile <c1 dumpfile of the training dataset>  
        --validation-c1-dumpfile <c1 dumpfile of the validation dataset>
