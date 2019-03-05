@@ -1,5 +1,7 @@
 # One-Shot Object Appearance Learning using Spiking Neural Networks #
 
+_Note: This project is no longer actively maintained and supported._
+
 This is a Spiking Neural Network used for testing one-shot object appearance 
 learning. That is the learning of new object features based on one or very few 
 training instances.
@@ -123,8 +125,8 @@ since weight changes to one synapse no longer need to be copied to all the
 others, but is read from a single shared table.
 
 In order to run the code, the user needs to install 
-[NEST](http://nest-simulator.org/) with 
-[PyNN](http://neuralensemble.org/PyNN/). Please
+[NEST](http://nest-simulator.org/) 2.10.0 with 
+[PyNN](http://neuralensemble.org/PyNN/) 0.8.1. Please
 consult their corresponding web pages for installation instructions.
 
 The code is written in **Python 3**, thus a working installation of it is also 
