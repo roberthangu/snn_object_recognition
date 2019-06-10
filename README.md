@@ -1,6 +1,7 @@
 # One-Shot Object Appearance Learning using Spiking Neural Networks #
 
-_Note: This project is no longer actively maintained and supported._
+_Note: This project is no longer actively maintained or supported._
+_Questions and issues might be answered with delay or not at all._
 
 This is a Spiking Neural Network used for testing one-shot object appearance 
 learning. That is the learning of new object features based on one or very few 
